@@ -138,7 +138,7 @@ def work(name, file):
     pf.to_csv('data_' + file, header=False, index=False)
 
 
-DATA_DIR = 'data/forecasting_sample/data/'
+DATA_DIR = 'data/argo/forecasting_sample/data/'
 # nameList = ['2645.csv','3700.csv','3828.csv','3861.csv','4791.csv']
 nameList = ['2645.csv']
 
