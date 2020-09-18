@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import numpy as np
 import torch
+import config.configure as config
 
 # TEST_DATA_PATH = 'data/data/'
 # TRAIN_DATA_PATH = 'data/data/'
@@ -10,14 +11,16 @@ import torch
 # TEST_FILE = ['3828.csv','3861.csv','4791.csv']
 
 
-TEST_DATA_PATH = 'data/test-data/'
-TRAIN_DATA_PATH = 'data/train-data/'
+TEST_DATA_PATH = config.TEST_DATA_PATH
+TRAIN_DATA_PATH = config.TRAIN_DATA_PATH
 
-for root, dirs, files in os.walk(TEST_DATA_PATH):
-    TEST_FILE = files
+# for root, dirs, files in os.walk(TEST_DATA_PATH):
+#     TEST_FILE = files
 
-for root, dirs, files in os.walk(TRAIN_DATA_PATH):
-    TRAIN_FILE = files
+# for root, dirs, files in os.walk(TRAIN_DATA_PATH):
+#     TRAIN_FILE = files
+TRAIN_FILE = sorted(os.listdir(TRAIN_DATA_PATH))
+TEST_FILE = sorted(os.listdir(TEST_DATA_PATH))
 
 r"""
 data structure:
@@ -47,7 +50,7 @@ def load_data(DATA_PATH, nameList):
     Y = []
     polyline_ID = 8
     type_ID = 4
-    maxSize = np.zeros(300)
+    maxSize = np.zeros(500)
     offset = []
     for name in nameList:
         ans = pd.read_csv(DATA_PATH + name, header=None)
@@ -127,6 +130,8 @@ def load_data(DATA_PATH, nameList):
 
         X.append(x)
         Y.append(y)
+    pf = pd.DataFrame(data=x)
+    pf.to_csv('train_data_' + name, header=False, index=False)
 
     ans = 0
     for i in range(0, maxSize.shape[0]):
@@ -145,8 +150,7 @@ def load_data(DATA_PATH, nameList):
             tmp = maxSize[i]
             lst = np.zeros(9)
             lst[polyline_ID] = i
-            while j < X[it].shape[0] and \
-                    X[it][j, polyline_ID] == i:
+            while j < X[it].shape[0] and X[it][j, polyline_ID] == i:
                 x.append(X[it][j])
                 lst = X[it][j]
                 j += 1
@@ -155,6 +159,8 @@ def load_data(DATA_PATH, nameList):
                 x.append(lst)
                 tmp -= 1
         XX.append(x)
+    pf = pd.DataFrame(data=XX[0])
+    pf.to_csv('train_data_XX_' + name, header=False, index=False)
     for i in range(len(offset)):
         XX[i].append(offset[i])
     XX = np.array(XX).astype('float')

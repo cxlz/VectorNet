@@ -3,16 +3,16 @@ import os
 import pandas as pd
 
 import numpy as np
-from configure import device
+from config.configure import device
 
 import torch
 
-from VectorNet import VectorNet
-from VectorNet import VectorNetWithPredicting
-from dataloader import load_train, load_test
+from models.VectorNet import VectorNet
+from models.VectorNet import VectorNetWithPredicting
+from data.dataloader import load_train, load_test
 import torch.nn.functional as F
 
-from generateH5 import generate_forecasting_h5
+from data.generateH5 import generate_forecasting_h5
 
 
 def load_data(DATA_PATH, nameList):

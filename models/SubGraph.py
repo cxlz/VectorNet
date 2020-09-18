@@ -2,8 +2,8 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-import MLP
-from configure import device
+from models.MLP import MLP
+from config.configure import device
 
 r"""
   Construct subgraph for a polyline.
@@ -90,7 +90,8 @@ class SubGraphLayer(nn.Module):
         :param len: the length of input vector.
         """
         super(SubGraphLayer, self).__init__()
-        self.g_enc = MLP.MLP(len, len)
+
+        self.g_enc = MLP(len, len)
         # self.decD = MLP.MLP(2*len, len)
 
     def forward(self, x):

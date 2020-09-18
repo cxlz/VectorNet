@@ -1,7 +1,7 @@
 import torch
 
-from configure import device
-from dataloader import load_test, load_train
+from config.configure import device
+from data.dataloader import load_test, load_train
 import matplotlib.pyplot as plt
 
 vectorNet = torch.load('VectorNet-test.model').to(device)

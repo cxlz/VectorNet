@@ -4,7 +4,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-from configure import device
+from config.configure import device
 
 r"""
 Generate N same modules.

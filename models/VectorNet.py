@@ -3,10 +3,10 @@ import copy
 import torch
 from torch import nn
 
-import MLP
-from GlobalGraph import Attention, clones
-from SubGraph import SubGraph
-from configure import device
+from models.MLP import MLP
+from models.GlobalGraph import Attention, clones
+from models.SubGraph import SubGraph
+from config.configure import device
 import torch.nn.functional as F
 
 
@@ -100,7 +100,7 @@ class VectorNetWithPredicting(nn.Module):
         """
         super(VectorNetWithPredicting, self).__init__()
         self.vectorNet = VectorNet(len=len)
-        self.trajDecoder = MLP.MLP(inputSize=self.vectorNet.pLen,
+        self.trajDecoder = MLP(inputSize=self.vectorNet.pLen,
                                    outputSize=timeStampNumber * 2,
                                    noReLU=False)
 

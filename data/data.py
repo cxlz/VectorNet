@@ -24,14 +24,19 @@
 # with open('data/feature/forecasting_features_test.pkl', "rb") as f:
 #     grid_search = pkl.load(f)
 #     print(grid_search)
+import sys
+sys.path.remove("/opt/ros/kinetic/lib/python2.7/dist-packages")
 import pickle
+import os
 
 import pandas as pd
 import numpy as np
+from argoverse.map_representation.map_api import ArgoverseMap
+import argparse
 
 X_ID = 3
 Y_ID = 4
-
+avm = ArgoverseMap()
 
 def vecLink(a, polyID):
     a = np.array(a)
@@ -49,6 +54,7 @@ def vecLink(a, polyID):
 
 
 def work(name, file):
+    print("Loading data from file: [%s]"%file)
     ans = pd.read_csv(name)
     ans = np.array(ans)
 
@@ -77,8 +83,7 @@ def work(name, file):
     j = 0
     polyID = 0
     for i in range(ans.shape[0]):
-        if i + 1 == ans.shape[0] or \
-                ans[i, track_id] != ans[i + 1, track_id]:
+        if i + 1 == ans.shape[0] or ans[i, track_id] != ans[i + 1, track_id]:
             now = []
             while j <= i:
                 now.append(ans[j])
@@ -94,15 +99,13 @@ def work(name, file):
                 AVTIME = ans[i-30, 0]
 
     idList = avm.get_lane_ids_in_xy_bbox(AVX, AVY, city, 200)
-
     for id in idList:
-        lane = a[city][id]
+        lane = avm.city_lane_centerlines_dict[city][id]
         #        print(lane.id)
         #        print(lane.has_traffic_control)
         #        print(lane.turn_direction)
         #        print(lane.is_intersection)
         #        print(lane.centerline)
-        polyID += 1
         ans = []
         for i in range(lane.centerline.shape[0] - 1):
             l, r = lane.centerline[i], lane.centerline[i + 1]
@@ -118,8 +121,9 @@ def work(name, file):
                    t,
                    0 if lane.is_intersection == False else 1,
                    polyID]
-
             tmp.append(now)
+            
+        polyID += 1
 
     tmp = np.array(tmp)
     for i in range(tmp.shape[0]):
@@ -135,15 +139,24 @@ def work(name, file):
     print(tmp)
     print(tmp.shape)
     pf = pd.DataFrame(data=tmp)
-    pf.to_csv('data_' + file, header=False, index=False)
+    pf.to_csv(os.path.join(args.save_dir, 'data_' + file), header=False, index=False)
 
 
-DATA_DIR = 'data/argo/forecasting_sample/data/'
-# nameList = ['2645.csv','3700.csv','3828.csv','3861.csv','4791.csv']
-nameList = ['2645.csv']
+# nameList = ['2645.csv','4791.csv']
 
-for name in nameList:
-    work(DATA_DIR + name,name)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-d", "--data_dir", type=str, default="data/argo/forecasting_sample/data", required=False, help="data load dir")
+    parser.add_argument("-s", "--save_dir", dest="save_dir", type=str, default="data/argo/train_data", required=False, help="data save dir")
+    args = parser.parse_args()
+    # DATA_DIR = 'data/argo/forecasting_sample/data/'
+    # nameList = ['2645.csv','3700.csv','3828.csv','3861.csv']
+    if not os.path.exists(args.save_dir):
+        os.makedirs(args.save_dir)
+    DATA_DIR = args.data_dir
+    nameList = os.listdir(DATA_DIR)
+    for name in nameList:
+        work(os.path.join(DATA_DIR, name) ,name)
 
 # df = pd.read_pickle(FEATURE_DIR + 'forecasting_features_test.pkl')
 

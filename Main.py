@@ -3,12 +3,11 @@ import numpy as np
 
 import torch
 
-from VectorNet import VectorNet
-from VectorNet import VectorNetWithPredicting
-from configure import device
-from dataloader import load_train, load_test
+from models.VectorNet import VectorNet
+from models.VectorNet import VectorNetWithPredicting
+from config.configure import device
+from data.dataloader import load_train, load_test
 import torch.nn.functional as F
-
 
 def askADE(a, b):
     r"""
@@ -179,10 +178,10 @@ def train(epoch, learningRate, batchSize):
 
                 print(outputs)
                 print(target)
-                # loss = lossfunc(outputs, target)
-                # print('loss=', loss.item())
+                loss = lossfunc(outputs, target)
+                print('loss=', loss.item())
                 t = askADE(outputs, target)
-                # print('minDis=', t[0].item(), 'ADE=', t[1].item())
+                print('minDis=', t[0].item(), 'ADE=', t[1].item())
 
                 # minADE += t[1]
                 if minDis > t[0]:
@@ -296,9 +295,8 @@ if __name__ == '__main__':
     parser.add_argument("--epoch", dest="epoch", default=25, type=int)
     parser.add_argument("--learning_rate", dest="lr", default=0.001, type=float)
     args = parser.parse_args()
-
-    # train(epoch=args.epoch, learningRate=args.lr, batchSize=args.batch_size)
-    test(batchSize=args.batch_size)
+    train(epoch=args.epoch, learningRate=args.lr, batchSize=args.batch_size)
+    # test(batchSize=args.batch_size)
     # testCV(batchSize=args.batch_size)
 
     # random_train(epoch=args.epoch, learningRate=args.lr, batchSize=args.batch_size)
