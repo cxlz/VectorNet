@@ -25,7 +25,7 @@
 #     grid_search = pkl.load(f)
 #     print(grid_search)
 import sys
-sys.path.remove("/opt/ros/kinetic/lib/python2.7/dist-packages")
+# sys.path.remove("/opt/ros/kinetic/lib/python2.7/dist-packages")
 import pickle
 import os
 
@@ -34,14 +34,21 @@ import numpy as np
 from argoverse.map_representation.map_api import ArgoverseMap
 import argparse
 
+time_steps = 49
+time_resolution = 0.1
+
 X_ID = 3
 Y_ID = 4
+track_id = 1
 avm = ArgoverseMap()
 
-def vecLink(a, polyID):
+def vecLink(a, polyID, time_step_diff=0):
     a = np.array(a)
-    ans = []
     type = 0 if a[0, 2] == 'AV' else 1
+    zerolist = np.zeros(9)
+    zerolist[-1] = polyID
+    # zerolist[4] = type
+    ans = [zerolist for i in range(time_step_diff)]
     for i in range(a.shape[0] - 1):
         l, r = a[i], a[i + 1]
         now = [l[X_ID], l[Y_ID], r[X_ID], r[Y_ID], type,
@@ -50,6 +57,8 @@ def vecLink(a, polyID):
                np.sqrt(np.square(l[X_ID]-r[X_ID])+np.square(l[Y_ID]-r[Y_ID])) / (r[0]-l[0]),
                polyID]
         ans.append(now)
+    for j in range(len(ans), time_steps):
+        ans.append(zerolist)
     return ans
 
 
@@ -59,14 +68,12 @@ def work(name, file):
     ans = np.array(ans)
 
     city = ans[0][-1]
-    track_id = 1
 
     id = np.argsort(ans[:, 0], kind='mergesort')
     tmp = np.zeros_like(ans)
     for i in range(ans.shape[0]):
         tmp[i] = ans[id[i]]
     ans = tmp
-
     id = np.argsort(ans[:, 1], kind='mergesort')
     tmp = np.zeros_like(ans)
     for i in range(ans.shape[0]):
@@ -78,26 +85,50 @@ def work(name, file):
     AVX = 0
     AVY = 0
     AVTIME = 0
+    AVID = ans[0, track_id]
 
     tmp = []
-    j = 0
+    now = []
     polyID = 0
+    cur_id = AVID
+    time_step_diff = 0
     for i in range(ans.shape[0]):
-        if i + 1 == ans.shape[0] or ans[i, track_id] != ans[i + 1, track_id]:
+        if ans[i, track_id] != cur_id or i + 1 == ans.shape[0]:
+            if time_step_diff < 19:
+                vecList = vecLink(now, polyID, time_step_diff)
+                for vec in vecList:
+                    tmp.append(vec)
+                polyID += 1
+            if cur_id == AVID:
+                AVX, AVY, AVTIME = vecList[0][0], vecList[0][1], vecList[0][5]
+            time_step_diff = round((ans[i, 0] - AVTIME) / time_resolution)
             now = []
-            while j <= i:
-                now.append(ans[j])
-                if j < i:
-                    assert ans[j, 0] <= ans[j + 1, 0]
-                j += 1
-            vecList = vecLink(now, polyID)
-            polyID += 1
-            for vec in vecList:
-                tmp.append(vec)
-            if ans[i, 2] == 'AV':
-                AVX, AVY = ans[i-30, 3], ans[i-30, 4]
-                AVTIME = ans[i-30, 0]
+            now.append(ans[i])
+            cur_id = ans[i, track_id]           
+        else:
+            now.append(ans[i])
+        # if i + 1 == ans.shape[0] or ans[i, track_id] != ans[i + 1, track_id]:
+        #     now = []
+        #     while j <= i:
+        #         now.append(ans[j])
+        #         if j < i:
+        #             assert ans[j, 0] <= ans[j + 1, 0]
+        #         j += 1
+        #     vecList = vecLink(now, polyID)
+        #     polyID += 1
+        #     for vec in vecList:
+        #         tmp.append(vec)
+        #     if ans[i, 2] == 'AV':
+        #         AVX, AVY = ans[i-30, 3], ans[i-30, 4]
+        #         AVTIME = ans[i-30, 0]
+    # print(tmp)
+    # print(tmp.shape)
+    tmp = np.array(tmp, dtype="float")
+    tmp[:, 5:7] -= AVTIME 
+    pf = pd.DataFrame(data=tmp)
+    pf.to_csv(os.path.join(args.save_dir, 'obj_data_' + file), header=False, index=False)
 
+    tmp = []
     idList = avm.get_lane_ids_in_xy_bbox(AVX, AVY, city, 200)
     for id in idList:
         lane = avm.city_lane_centerlines_dict[city][id]
@@ -126,20 +157,20 @@ def work(name, file):
         polyID += 1
 
     tmp = np.array(tmp)
-    for i in range(tmp.shape[0]):
-        tmp[i, 0] -= AVX
-        tmp[i, 2] -= AVX
-        tmp[i, 1] -= AVY
-        tmp[i, 3] -= AVY
-        for j in range(4):
-            tmp[i , j] *= 100
-        if tmp[i, 4] != 2:
-            tmp[i, 5] -= AVTIME
+    # for i in range(tmp.shape[0]):
+    #     tmp[i, 0] -= AVX
+    #     tmp[i, 2] -= AVX
+    #     tmp[i, 1] -= AVY
+    #     tmp[i, 3] -= AVY
+    #     for j in range(4):
+    #         tmp[i , j] *= 100
+    #     if tmp[i, 4] != 2:
+    #         tmp[i, 5] -= AVTIME
 
-    print(tmp)
-    print(tmp.shape)
+    # print(tmp)
+    # print(tmp.shape)
     pf = pd.DataFrame(data=tmp)
-    pf.to_csv(os.path.join(args.save_dir, 'data_' + file), header=False, index=False)
+    pf.to_csv(os.path.join(args.save_dir, 'map_data_' + file), header=False, index=False)
 
 
 # nameList = ['2645.csv','4791.csv']
@@ -155,6 +186,7 @@ if __name__ == "__main__":
         os.makedirs(args.save_dir)
     DATA_DIR = args.data_dir
     nameList = os.listdir(DATA_DIR)
+    nameList.sort()
     for name in nameList:
         work(os.path.join(DATA_DIR, name) ,name)
 

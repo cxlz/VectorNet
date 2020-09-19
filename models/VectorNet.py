@@ -2,6 +2,7 @@ import copy
 
 import torch
 from torch import nn
+import numpy as np
 
 from models.MLP import MLP
 from models.GlobalGraph import Attention, clones
@@ -58,7 +59,8 @@ class VectorNet(nn.Module):
         P = torch.zeros(batchSize, 0, self.pLen).to(device)
 
         j = 1
-        for i in range(1, data.shape[0]):
+        pid = []
+        for i in range(data.shape[0]):
             if i + 1 == data.shape[0] or \
                     pID[i] != pID[i + 1]:
                 tmp = torch.zeros(batchSize, 0, len).to(device)
@@ -67,6 +69,8 @@ class VectorNet(nn.Module):
                     t.unsqueeze_(1)  # [batch size, 1, len]
                     tmp = torch.cat((tmp, t), dim=1)
                     j += 1
+                pid.append(pID[i].item())
+                
 
                 # tmp's shape is [batch size, pvNumber, Len]
                 # subGraphId = int(data[i, 0, len - 1].item())
@@ -78,6 +82,7 @@ class VectorNet(nn.Module):
 
         # P's shape is [batch size, pNumber, pLen]
         # P = F.normalize(P, dim=2)
+        pid = torch.from_numpy(np.array(pid)).to(device).unsqueeze
         feature = self.globalGraph(P, id)  # [batch size, pLen]
         # print(feature.device)
         # print(feature.shape)
@@ -102,7 +107,7 @@ class VectorNetWithPredicting(nn.Module):
         self.vectorNet = VectorNet(len=len)
         self.trajDecoder = MLP(inputSize=self.vectorNet.pLen,
                                    outputSize=timeStampNumber * 2,
-                                   noReLU=False)
+                                   noReLU=True)
 
 
     def forward(self, x):

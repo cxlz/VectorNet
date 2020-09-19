@@ -1,13 +1,40 @@
 import argparse
 import numpy as np
+import os
 
 import torch
 
 from models.VectorNet import VectorNet
 from models.VectorNet import VectorNetWithPredicting
-from config.configure import device
+# from config.configure import device
 from data.dataloader import load_train, load_test
+from data.dataloader import ArgoDataset
 import torch.nn.functional as F
+import config.configure as config
+
+device = config.device
+time_steps = config.time_steps
+train_time_steps = config.train_time_steps
+TEST_DATA_PATH = config.TEST_DATA_PATH
+TRAIN_DATA_PATH = config.TRAIN_DATA_PATH
+
+# for root, dirs, files in os.walk(TEST_DATA_PATH):
+#     TEST_FILE = files
+
+# for root, dirs, files in os.walk(TRAIN_DATA_PATH):
+#     TRAIN_FILE = files
+TRAIN_FILE = []
+TEST_FILE = []
+
+for file in os.listdir(TRAIN_DATA_PATH):
+    if file.split("_")[0] == "obj":
+        TRAIN_FILE.append(file)
+for file in os.listdir(TEST_DATA_PATH):
+    if file.split("_")[0] == "obj":
+        TEST_FILE.append(file)
+TRAIN_FILE.sort()
+TEST_FILE.sort()
+
 
 def askADE(a, b):
     r"""
@@ -120,10 +147,10 @@ def train(epoch, learningRate, batchSize):
     :return: None
     """
 
-    train = load_train()
-    trainset = torch.utils.data.DataLoader(train, batch_size=batchSize)
-    test = load_test()
-    testset = torch.utils.data.DataLoader(test, batch_size=batchSize)
+    train_data = ArgoDataset(TRAIN_DATA_PATH, TRAIN_FILE) 
+    trainset = torch.utils.data.DataLoader(train_data, batch_size=1, shuffle=True)
+    test_data = ArgoDataset(TEST_DATA_PATH, TEST_FILE)
+    testset = torch.utils.data.DataLoader(test_data, batch_size=1)
 
     vectorNet = VectorNetWithPredicting(len=9, timeStampNumber=30)
 
@@ -137,17 +164,36 @@ def train(epoch, learningRate, batchSize):
     optimizer = torch.optim.Adam(vectorNet.parameters(), lr=lr)
     for iterator in range(epoch):
         for data, target in trainset:
-            data = data.to(device)
-            target = target.to(device)
+            data = data.float().numpy()
+            target = target.float().numpy()
+            for i in range(data.shape[0]):
+                AVX = np.max(data[i, :train_time_steps - 1, 0:3:2])                    
+                AVY = np.max(data[i, :train_time_steps - 1, 1:4:2])                
+                data[i, :, 0:3:2] -= AVX
+                data[i, :, 1:4:2] -= AVY
+                target[i, :, 0] -= AVX
+                target[i, :, 1] -= AVY
+                maxX = np.max(np.abs(data[i, :train_time_steps, 0:3:2]))                    
+                maxY = np.max(np.abs(data[i, :train_time_steps, 1:4:2]))                
+                data[i, :, 0:3:2] /= maxX
+                data[i, :, 1:4:2] /= maxY
+                target[i, :, 0] /= maxX
+                target[i, :, 1] /= maxY
+            target = np.reshape(target[i, :30], (target.shape[0], -1))
+
+            data = torch.from_numpy(data).to(device).float()
+            target = torch.from_numpy(target).to(device).float()
             optimizer.zero_grad()
 
-            offset = data[:, -1, :]  # [0, 0, 0, 0, 0, maxX, maxY, ..., 0]
-            data = data[:, 0:data.shape[1] - 1, :]
+            # offset = data[:, -1, :]  # [0, 0, 0, 0, 0, maxX, maxY, ..., 0]
+            # data = data[:, 0:data.shape[1] - 1, :]
 
             outputs = vectorNet(data) # [batch size, len*2]
 
             loss = lossfunc(outputs, target)
             loss.backward()
+            print(outputs)
+            print(target)
             # print(iterator)
             # print('loss=',loss.item())
             # t = askADE(outputs, target)
@@ -162,32 +208,38 @@ def train(epoch, learningRate, batchSize):
             minDis = torch.zeros(1).to(device)
             minDis[0] = float('inf')
             for data, target in testset:
-                data = data.to(device)
-                target = target.to(device)
+                data = data.float().numpy()
+                target = target.float().numpy()
+                for i in range(data.shape[0]):
+                    AVX = np.max(data[i, :train_time_steps - 1, 0:3:2])                    
+                    AVY = np.max(data[i, :train_time_steps - 1, 1:4:2])                
+                    data[i, :, 0:3:2] -= AVX
+                    data[i, :, 1:4:2] -= AVY
+                    target[i, :, 0] -= AVX
+                    target[i, :, 1] -= AVY
+                    maxX = np.max(np.abs(data[i, :train_time_steps, 0:3:2]))                    
+                    maxY = np.max(np.abs(data[i, :train_time_steps, 1:4:2]))                
+                    data[i, :, 0:3:2] /= maxX
+                    data[i, :, 1:4:2] /= maxY
+                    target[i, :, 0] /= maxX
+                    target[i, :, 1] /= maxY
+                target = np.reshape(target[i, :30], (target.shape[0], -1))
 
-                offset = data[:, -1, :]  # [0, 0, 0, 0, 0, maxX, maxY, ..., 0]
-                data = data[:, 0:data.shape[1] - 1, :]
-
-                outputs = vectorNet(data)
-
-                for i in range(0, outputs.shape[1], 2):
-                    outputs[:, i] *= offset[:, 5]
-                    target[:, i] *= offset[:, 5]
-                    outputs[:, i + 1] *= offset[:, 6]
-                    target[:, i + 1] *= offset[:, 6]
+                data = torch.from_numpy(data).to(device).float()
+                target = torch.from_numpy(target).to(device).float()
 
                 print(outputs)
                 print(target)
                 loss = lossfunc(outputs, target)
                 print('loss=', loss.item())
-                t = askADE(outputs, target)
-                print('minDis=', t[0].item(), 'ADE=', t[1].item())
+                # t = askADE(outputs, target)
+                # print('minDis=', t[0].item(), 'ADE=', t[1].item())
 
-                # minADE += t[1]
-                if minDis > t[0]:
-                    minDis = t[0]
-                    minADE = t[1]
-            print('minDis=', minDis.item(), 'minADE=', minADE.item())
+                # # minADE += t[1]
+                # if minDis > t[0]:
+                #     minDis = t[0]
+                #     minADE = t[1]
+            # print('minDis=', minDis.item(), 'minADE=', minADE.item())
 
     torch.save(vectorNet, 'VectorNet-test.model')
 
