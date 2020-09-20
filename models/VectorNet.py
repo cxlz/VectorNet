@@ -60,7 +60,7 @@ class VectorNet(nn.Module):
 
         j = 1
         pid = []
-        for i in range(data.shape[0]):
+        for i in range(1, data.shape[0]):
             if i + 1 == data.shape[0] or \
                     pID[i] != pID[i + 1]:
                 tmp = torch.zeros(batchSize, 0, len).to(device)

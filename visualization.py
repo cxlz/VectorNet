@@ -4,7 +4,7 @@ from config.configure import device
 from data.dataloader import load_test, load_train
 import matplotlib.pyplot as plt
 
-vectorNet = torch.load('VectorNet-test.model').to(device)
+vectorNet = torch.load('VectorNet_test.model').to(device)
 
 def viz(x, y):
 

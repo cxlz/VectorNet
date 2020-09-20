@@ -74,6 +74,8 @@ def load_data(DATA_PATH, nameList):
         obj_num = round(ans.shape[0] / time_steps) 
         X = np.zeros((0, ans.shape[1]))
         Y = np.zeros((0, 2))
+        data_len = [0]
+        label_len = [0]
         for i in range(obj_num):
             cur_pos = i * time_steps
             data_pos = cur_pos + train_time_steps
@@ -82,13 +84,48 @@ def load_data(DATA_PATH, nameList):
             label = ans[data_pos:label_pos, :]
             idx = data[:, 2] != 0
             data = data[idx, :]
+            data_len.append(data_len[-1] + data.shape[0])
             idx = label[:, 2] != 0
             label = label[idx, :]
+            label_len.append(label_len[-1] + label.shape[0])
             X = np.concatenate((X, data))
             Y = np.concatenate((Y, label[:, 2:4]))
         X = np.concatenate((X, map_data))
-        XX.append(X)
-        YY.append(Y)
+        xx = []
+        yy = []
+        for i in range(obj_num):
+            if data_len[i + 1] - data_len[i] > config.min_train_time_steps \
+                and label_len[i + 1] - label_len[i] == config.pred_time_steps:
+                x = X.copy()
+                y = Y[label_len[i]:label_len[i + 1]].copy()
+                AVX = x[data_len[i + 1] - 1, 2]
+                AVY = x[data_len[i + 1] - 1, 3]
+                x[:, 0:3:2] -= AVX
+                x[:, 1:4:2] -= AVY
+                y[:, 0] -= AVX
+                y[:, 1] -= AVY
+                maxX = np.max(np.abs(x[data_len[i]:data_len[i + 1], 0:3:2]))
+                maxY = np.max(np.abs(x[data_len[i]:data_len[i + 1], 1:4:2]))
+                # if maxX == np or maxY == 0 or np.isnan(maxX) or np.isnan(maxY):
+                #     continue
+                x[:, 0:3:2] /= maxX
+                x[:, 1:4:2] /= maxY
+                y[:, 0] /= maxX
+                y[:, 1] /= maxY
+                tmp = np.zeros((1, 9))
+                tmp[0, 0] = i
+                tmp[0, 1] = AVX
+                tmp[0, 2] = AVY
+                tmp[0, 3] = maxX
+                tmp[0, 4] = maxY
+                x = np.concatenate((tmp, x), axis=0)
+                y = np.reshape(y, -1)
+                tmp = np.zeros(config.pred_time_steps * 2 - y.shape[0])
+                y = np.concatenate((y, tmp), axis=0)
+                xx.append(x)
+                yy.append(y)
+        XX.append(np.array(xx))
+        YY.append(np.array(yy))
     return XX, YY
 
     #     x, tx, y = [], [], []
