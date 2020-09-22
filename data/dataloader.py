@@ -1,5 +1,7 @@
 import os
 
+from tqdm import tqdm
+
 import pandas as pd
 import numpy as np
 import torch
@@ -50,9 +52,9 @@ def load_data(DATA_PATH, nameList):
     Y = []
     polyline_ID = 8
     type_ID = 4
-    maxSize = np.zeros(500)
+    maxSize = np.zeros(1000)
     offset = []
-    for name in nameList:
+    for name in tqdm(nameList):
         ans = pd.read_csv(DATA_PATH + name, header=None)
         ans = np.array(ans)
         x, tx, y = [], [], []
@@ -64,9 +66,9 @@ def load_data(DATA_PATH, nameList):
                 maxX = np.max([maxX, np.abs(ans[i, 0]), np.abs(ans[i, 2])])
                 maxY = np.max([maxY, np.abs(ans[i, 1]), np.abs(ans[i, 3])])
 
-        for i in range(ans.shape[0]):
-            if ans[i, type_ID] != 2:
-                ans[i, 5] = ans[i, 6] = ans[i, 7] = 0
+        # for i in range(ans.shape[0]):
+        #     if ans[i, type_ID] != 2:
+        #         ans[i, 5] = ans[i, 6] = ans[i, 7] = 0
 
         dx, dy = 1, 1
         for i in range(ans.shape[0]):
@@ -85,7 +87,8 @@ def load_data(DATA_PATH, nameList):
                     # if i-j+1 != 49:
                     #     print(DATA_PATH + 'data_' + name)
 
-                    assert i - j + 1 == 49
+                    if i - j + 1 != 49:
+                        break
                     maxSize[id] = np.max([maxSize[id], 19])
                     if ans[j, 0] > 0:
                         dx = -1
@@ -104,7 +107,7 @@ def load_data(DATA_PATH, nameList):
                     while j <= i:
                         tx.append(ans[j])
                         j += 1
-        print(dx, dy, name)
+        # print(dx, dy, name)
 
         for xx in tx:
             xx[0] *= dx
@@ -121,7 +124,8 @@ def load_data(DATA_PATH, nameList):
             y[i + 1] *= dy
             y[i] /= maxX
             y[i + 1] /= maxY
-
+        x[0][3] = maxX
+        x[0][4] = maxY
         offset.append([0, 0, 0, 0, 0, maxX, maxY, 0, 0])
         x = np.array(x).astype('float')
         y = np.array(y).astype('float')
@@ -130,8 +134,8 @@ def load_data(DATA_PATH, nameList):
 
         X.append(x)
         Y.append(y)
-    pf = pd.DataFrame(data=x)
-    pf.to_csv('train_data_' + name, header=False, index=False)
+    # pf = pd.DataFrame(data=x)
+    # pf.to_csv('train_data_' + name, header=False, index=False)
 
     ans = 0
     for i in range(0, maxSize.shape[0]):
@@ -159,8 +163,8 @@ def load_data(DATA_PATH, nameList):
                 x.append(lst)
                 tmp -= 1
         XX.append(x)
-    pf = pd.DataFrame(data=XX[0])
-    pf.to_csv('train_data_XX_' + name, header=False, index=False)
+    # pf = pd.DataFrame(data=XX[0])
+    # pf.to_csv('train_data_XX_' + name, header=False, index=False)
     for i in range(len(offset)):
         XX[i].append(offset[i])
     XX = np.array(XX).astype('float')
@@ -189,7 +193,7 @@ def load_train():
     Loading train set.
     :return: train set.
     """
-    return load_data(TRAIN_DATA_PATH, TRAIN_FILE)
+    return load_data(TRAIN_DATA_PATH, TRAIN_FILE[:5000])
 
 
 def load_test():
@@ -197,7 +201,7 @@ def load_test():
     Loading test set.
     :return: test set.
     """
-    return load_data(TEST_DATA_PATH, TEST_FILE)
+    return load_data(TEST_DATA_PATH, TEST_FILE[:500])
 
 # if __name__ == '__main__':
 #     load_train()

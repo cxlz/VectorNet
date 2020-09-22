@@ -54,7 +54,7 @@ def vecLink(a, polyID):
 
 
 def work(name, file):
-    print("Loading data from file: [%s]"%file)
+    # print("Loading data from file: [%s]"%file)
     ans = pd.read_csv(name)
     ans = np.array(ans)
 
@@ -98,7 +98,7 @@ def work(name, file):
                 AVX, AVY = ans[i-30, 3], ans[i-30, 4]
                 AVTIME = ans[i-30, 0]
 
-    idList = avm.get_lane_ids_in_xy_bbox(AVX, AVY, city, 200)
+    idList = avm.get_lane_ids_in_xy_bbox(AVX, AVY, city, 20)
     for id in idList:
         lane = avm.city_lane_centerlines_dict[city][id]
         #        print(lane.id)
@@ -136,8 +136,8 @@ def work(name, file):
         if tmp[i, 4] != 2:
             tmp[i, 5] -= AVTIME
 
-    print(tmp)
-    print(tmp.shape)
+    # print(tmp)
+    # print(tmp.shape)
     pf = pd.DataFrame(data=tmp)
     pf.to_csv(os.path.join(args.save_dir, 'data_' + file), header=False, index=False)
 
@@ -147,7 +147,8 @@ def work(name, file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--data_dir", type=str, default="data/argo/forecasting_sample/data", required=False, help="data load dir")
-    parser.add_argument("-s", "--save_dir", dest="save_dir", type=str, default="data/argo/train_data", required=False, help="data save dir")
+    parser.add_argument("-s", "--save_dir", type=str, default="data/argo/train_data", required=False, help="data save dir")
+    parser.add_argument("-n", "--num", type=int, default=500, required=False, help="num of files to load")
     args = parser.parse_args()
     # DATA_DIR = 'data/argo/forecasting_sample/data/'
     # nameList = ['2645.csv','3700.csv','3828.csv','3861.csv']
@@ -155,7 +156,10 @@ if __name__ == "__main__":
         os.makedirs(args.save_dir)
     DATA_DIR = args.data_dir
     nameList = os.listdir(DATA_DIR)
-    for name in nameList:
+    args.num = min(args.num, len(nameList))
+    for i, name in enumerate(nameList[:args.num]):
+        if i % 500 == 0 and i != 0:
+            print("[%d] data loaded"%i)
         work(os.path.join(DATA_DIR, name) ,name)
 
 # df = pd.read_pickle(FEATURE_DIR + 'forecasting_features_test.pkl')
