@@ -2,9 +2,14 @@ import os
 
 import pandas as pd
 import numpy as np
+from tqdm import tqdm
 import torch
 from torch.utils import data
+
+from argoverse.map_representation.map_api import ArgoverseMap
+
 import config.configure as config
+from data.data import mapVec, City
 
 # TEST_DATA_PATH = 'data/data/'
 # TRAIN_DATA_PATH = 'data/data/'
@@ -50,7 +55,7 @@ data structure:
       'att3' represents whether it is a intersection.
     
 """
-
+avm = ArgoverseMap()
 
 def load_data(DATA_PATH, nameList):
     r"""
@@ -65,14 +70,17 @@ def load_data(DATA_PATH, nameList):
     offset = []
     XX = []
     YY = []
-    for name in nameList:
-        ans = pd.read_csv(DATA_PATH + name, header=None)
+    for name in tqdm(nameList):
+        ans = pd.read_csv(os.path.join(DATA_PATH, name), header=None)
         ans = np.array(ans)
-        map_name = name.replace("obj", "map")
-        map_data = pd.read_csv(DATA_PATH + map_name, header=None)
-        map_data = np.array(map_data)
+        head_line = ans[0]
+        city = City(head_line[0]).name
+        ans = ans[1:]
+        # map_name = name.replace("obj", "map")
+        # map_data = pd.read_csv(DATA_PATH + map_name, header=None)
+        # map_data = np.array(map_data)
         obj_num = round(ans.shape[0] / time_steps) 
-        X = np.zeros((0, ans.shape[1]))
+        X = np.zeros((0, config.feature_length))
         Y = np.zeros((0, 2))
         data_len = [0]
         label_len = [0]
@@ -90,7 +98,7 @@ def load_data(DATA_PATH, nameList):
             label_len.append(label_len[-1] + label.shape[0])
             X = np.concatenate((X, data))
             Y = np.concatenate((Y, label[:, 2:4]))
-        X = np.concatenate((X, map_data))
+        # X = np.concatenate((X, map_data))
         xx = []
         yy = []
         for i in range(obj_num):
@@ -100,6 +108,8 @@ def load_data(DATA_PATH, nameList):
                 y = Y[label_len[i]:label_len[i + 1]].copy()
                 AVX = x[data_len[i + 1] - 1, 2]
                 AVY = x[data_len[i + 1] - 1, 3]
+                map_data = mapVec(AVX, AVY, city, config.map_search_radius, obj_num, avm)
+                x = np.concatenate((x, map_data), axis=0)
                 x[:, 0:3:2] -= AVX
                 x[:, 1:4:2] -= AVY
                 y[:, 0] -= AVX
@@ -124,6 +134,15 @@ def load_data(DATA_PATH, nameList):
                 y = np.concatenate((y, tmp), axis=0)
                 xx.append(x)
                 yy.append(y)
+        max_feat_num = -1
+        for i in range(len(xx)):
+            if len(xx[i]) > max_feat_num:
+                max_feat_num = len(xx[i])
+        zerolist = np.zeros((1, config.feature_length))
+        for i in range(len(xx)):
+            zerolist[0, -1] = xx[i][0, -1]
+            for j in range(len(xx[i]), max_feat_num):
+                xx[i] = np.concatenate((xx[i], zerolist), axis=0)
         XX.append(np.array(xx))
         YY.append(np.array(yy))
     return XX, YY

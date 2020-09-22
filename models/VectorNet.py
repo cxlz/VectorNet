@@ -53,7 +53,7 @@ class VectorNet(nn.Module):
         data = data.permute(1, 0, 2)  # [vNumber, batch size, len]
         id = data[0, :, 0].long()
         pID = data[:, 0, -1].long()
-        data[:, :, -1] = 0
+        # data[:, :, -1] = 0
 
         batchSize, len = data.shape[1], data.shape[2]
         P = torch.zeros(batchSize, 0, self.pLen).to(device)

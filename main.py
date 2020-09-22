@@ -1,6 +1,8 @@
 import argparse
 import numpy as np
 import os
+import cv2
+import time
 
 from tqdm import tqdm
 
@@ -138,7 +140,59 @@ def random_train(epoch, learningRate, batchSize):
             # print("???")
         print(iterator)
 
+def visualize(data, labels, prediction):
+    img_half_scale = 20
+    img_resolution = 0.1
+    img_half_scale = round(img_half_scale / img_resolution)
+    for traj, label, pred in zip(data, labels, prediction):
+        tmp = traj[0]
+        traj = traj[1:, :]
+        idx = tmp[0]
+        AVX = tmp[1]
+        AVY = tmp[2]
+        maxX = tmp[3]
+        maxY = tmp[4]
+        traj[:, 0:3:2] *= (maxX / img_resolution)
+        traj[:, 1:4:2] *= (maxY / img_resolution)
+        label[0:-2:2] *= (maxX / img_resolution)
+        label[1:-1:2] *= (maxY / img_resolution)
+        pred[0:-2:2] *= (maxX / img_resolution)
+        pred[1:-1:2] *= (maxY / img_resolution)
+        # traj *= img_resolution
+        # label *= img_resolution
+        traj = traj.astype("int")
+        label = label.astype("int")
+        pred = pred.astype("int")
+        img = np.zeros((img_half_scale * 2, img_half_scale * 2, 3))
+        for i in range(traj.shape[0] - 1):
+            if traj[i, 4] == 2:
+                line_color = (255, 255, 255)
+                img = cv2.circle(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale), 2, line_color)
+            else:
+                if traj[i, -1] == idx:
+                    line_color = (255, 0, 0)
+                    if traj[i, -1] == traj[i + 1, -1]:
+                        img = cv2.line(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale),
+                                        (traj[i + 1, 0] + img_half_scale, traj[i + 1, 1] + img_half_scale), line_color, thickness=2)
+                    # img = cv2.circle(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale), 1, line_color, lineType=8)
+                else:
+                    line_color = (0, 255, 0)
+                    img = cv2.circle(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale), 1, line_color, lineType=8)
+            
 
+        line_color = (255, 0, 0)
+        for j in range(label.shape[0] // 2 - 1):
+            img = cv2.circle(img, (label[j * 2] + img_half_scale, label[j * 2 + 1] + img_half_scale), 2, line_color, lineType=8)
+        
+        line_color = (0, 0, 255)
+        for j in range(pred.shape[0] // 2 - 1):
+            img = cv2.circle(img, (pred[j * 2] + img_half_scale, pred[j * 2 + 1] + img_half_scale), 2, line_color, lineType=8)
+
+            # img = cv2.line(img, (label[j * 2] + img_half_scale, label[j * 2 + 1] + img_half_scale), 
+            #                 (label[j * 2 + 2] + img_half_scale, label[j * 2 + 3] + img_half_scale), line_color, thickness=2)
+        cv2.imshow("img", img)
+        cv2.waitKey(1)
+        
 
 def train(epoch, learningRate, batchSize=1):
     r"""
@@ -148,10 +202,11 @@ def train(epoch, learningRate, batchSize=1):
     :param batchSize:
     :return: None
     """
-
-    train_data = ArgoDataset(TRAIN_DATA_PATH, TRAIN_FILE) 
+    print("loading train data from: [%s]"%TRAIN_DATA_PATH)
+    train_data = ArgoDataset(TRAIN_DATA_PATH, TRAIN_FILE[:2000]) 
     trainset = torch.utils.data.DataLoader(train_data, batch_size=batchSize, shuffle=True)
-    test_data = ArgoDataset(TEST_DATA_PATH, TEST_FILE)
+    print("loading test data from: [%s]"%TEST_DATA_PATH)
+    test_data = ArgoDataset(TEST_DATA_PATH, TEST_FILE[:200])
     testset = torch.utils.data.DataLoader(test_data, batch_size=batchSize)
 
     vectorNet = VectorNetWithPredicting(len=config.feature_length, timeStampNumber=config.pred_time_steps)
@@ -167,13 +222,13 @@ def train(epoch, learningRate, batchSize=1):
     optimizer = torch.optim.Adam(vectorNet.parameters(), lr=lr)
     loss_meter = meter.AverageValueMeter()
     maeloss_meter = meter.AverageValueMeter()
+    pre_loss = float("inf")
     for iterator in range(epoch):
-        print(iterator)
+        print("epoch [%d]: learning rate [%f]"%(iterator, lr))
         loss_meter.reset()
         for ii, (data, target) in tqdm(enumerate(trainset)):
             data = data.squeeze(0).to(device).float()
             target = target.squeeze(0).to(device).float()
-
             optimizer.zero_grad()
             outputs = vectorNet(data) # [batch size, len*2]
             loss = lossfunc(outputs, target)
@@ -188,10 +243,24 @@ def train(epoch, learningRate, batchSize=1):
             # t = askADE(outputs, target)
             # print('minFDE=', t[0].item(), 'ADE=', t[1].item())
             optimizer.step()
+            if config.visual:
+                visualize(data.detach().cpu().numpy(), target.detach().cpu().numpy(), outputs.detach().cpu().numpy())
+            if ii % 200 == 0 and ii > 0:
+                print("iterate [%d], train loss: [%f]"%(ii, loss_meter.value()[0]))
+                
+        print("train loss: ", loss_meter.value()[0])
+        if loss_meter.value()[0] < pre_loss:
+            pre_loss = loss_meter.value()[0]
+            name = time.strftime('VectorNet_%m%d_%H:%M:%S.model')
+            torch.save(vectorNet, os.path.join(config.model_save_path, name))
+        else:
+            lr *= config.lr_decay
+            for param_group in optimizer.param_groups:
+                param_group['lr'] = lr
+
         if (iterator + 1) % 5 == 0:
             print("train mse loss: ", loss_meter.value()[0])
             print("train mae loss: ", maeloss_meter.value()[0])
-            lr *= 0.3
             loss_meter.reset()
             optimizer = torch.optim.Adam(vectorNet.parameters(), lr=lr)
 
@@ -204,8 +273,8 @@ def train(epoch, learningRate, batchSize=1):
                 outputs = vectorNet(data) # [batch size, len*2]
 
                 loss = lossfunc(outputs, target)
-                print(outputs)
-                print(target)
+                # print(outputs)
+                # print(target)
                 # print('loss=', loss.item())
                 loss_meter.add(loss.item())
                 # t = askADE(outputs, target)
