@@ -1,7 +1,10 @@
 import argparse
 import numpy as np
 import sys
-sys.path.remove("/opt/ros/kinetic/lib/python2.7/dist-packages")
+try:
+    sys.path.remove("/opt/ros/kinetic/lib/python2.7/dist-packages")
+except:
+    pass
 import os
 import cv2
 import time
@@ -120,11 +123,12 @@ def random_train(epoch, learningRate, batchSize):
             # print("???")
         print(iterator)
 
-
+count = 0
 def visualize(data, labels, prediction, pID):
     img_half_scale = 20
     img_resolution = 0.1
     img_half_scale = round(img_half_scale / img_resolution)
+    global count
     for traj, label, pred in zip(data, labels, prediction):
         tmp = traj[0]
         traj = traj[1:, :]
@@ -144,13 +148,16 @@ def visualize(data, labels, prediction, pID):
         traj = traj.astype("int")
         label = label.astype("int")
         pred = pred.astype("int")
-        img = np.zeros((img_half_scale * 2, img_half_scale * 2, 3))
-        for i in range(traj.shape[0] - 1):
+        img = np.ones((img_half_scale * 2, img_half_scale * 2, 3)) * 255
+        for i in range(traj.shape[0] - 2, -1, -1):
             if traj[i, 0] == 0 and traj[i + 1, 0] == 0:
                 continue
             if traj[i, 4] == 2:
-                line_color = (255, 255, 255)
-                img = cv2.circle(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale), 2, line_color)
+                line_color = (0, 0, 0)
+                # img = cv2.circle(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale), 1, line_color)
+                if pID[i] == pID[i + 1] and traj[i + 1, 0] != 0:
+                    img = cv2.line(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale),
+                                    (traj[i + 1, 0] + img_half_scale, traj[i + 1, 1] + img_half_scale), line_color, thickness=1)
             else:
                 if pID[i] == idx:
                     line_color = (255, 0, 0)
@@ -160,21 +167,24 @@ def visualize(data, labels, prediction, pID):
                     # img = cv2.circle(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale), 1, line_color, lineType=8)
                 else:
                     line_color = (0, 255, 0)
-                    img = cv2.circle(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale), 1, line_color, lineType=8)
+                    img = cv2.circle(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale), 1, line_color, thickness= -1)
             
 
         line_color = (255, 0, 0)
         for j in range(label.shape[0] // 2 - 1):
-            img = cv2.circle(img, (label[j * 2] + img_half_scale, label[j * 2 + 1] + img_half_scale), 2, line_color, lineType=8)
+            img = cv2.circle(img, (label[j * 2] + img_half_scale, label[j * 2 + 1] + img_half_scale), 3, line_color, thickness= 2)
         
         line_color = (0, 0, 255)
         for j in range(pred.shape[0] // 2 - 1):
-            img = cv2.circle(img, (pred[j * 2] + img_half_scale, pred[j * 2 + 1] + img_half_scale), 2, line_color, lineType=8)
+            img = cv2.circle(img, (pred[j * 2] + img_half_scale, pred[j * 2 + 1] + img_half_scale), 3, line_color, thickness= -1)
 
             # img = cv2.line(img, (label[j * 2] + img_half_scale, label[j * 2 + 1] + img_half_scale), 
             #                 (label[j * 2 + 2] + img_half_scale, label[j * 2 + 3] + img_half_scale), line_color, thickness=2)
         cv2.imshow("img", img)
         cv2.waitKey(1)
+        if config.save_view:
+            cv2.imwrite(os.path.join(config.save_view_path, str(count) + ".jpg"), img)
+            count += 1
 
 
 def train(epoch, learningRate, batchSize):
@@ -191,11 +201,15 @@ def train(epoch, learningRate, batchSize):
     test = load_test()
     testset = torch.utils.data.DataLoader(test, batch_size=batchSize)
 
-    vectorNet = VectorNetWithPredicting(len=9, timeStampNumber=30)
+    if config.load_model_path:
+        vectorNet = torch.load(config.load_model_path)
+    else:
+        vectorNet = VectorNetWithPredicting(len=9, timeStampNumber=30)
 
     # for para in vectorNet.named_parameters():
     #     print(para)
     # exit(0)
+
     vectorNet = vectorNet.to(device)
 
     lossfunc = torch.nn.MSELoss()
@@ -243,14 +257,15 @@ def train(epoch, learningRate, batchSize):
         print("train mae loss: ", mae_loss_meter.value()[0])
         if loss_meter.value()[0] < pre_loss:
             pre_loss = loss_meter.value()[0]
-            # name = time.strftime('VectorNet_%m%d_%H:%M:%S.model')
-            # torch.save(vectorNet, os.path.join(config.model_save_path, name))
+            model_name = time.strftime(config.model_save_prefix + '%m%d_%H:%M:%S.model')
+            torch.save(vectorNet, os.path.join(config.model_save_path, model_name))
         else:
             lr *= config.lr_decay
             for param_group in optimizer.param_groups:
                 param_group['lr'] = lr
         if (iterator + 1) % 5 == 0:
-            lr *= 0.3
+            # lr *= 0.3
+            loss_meter.reset()
             optimizer = torch.optim.Adam(vectorNet.parameters(), lr=lr)
 
             minADE = torch.zeros(1).to(device)
@@ -274,7 +289,10 @@ def train(epoch, learningRate, batchSize):
                 # print(outputs)
                 # print(target)
                 loss = lossfunc(outputs, target)
-                print('loss=', loss.item())
+                # print('loss=', loss.item())
+                loss_meter.add(loss.item())
+            print("test loss: ", loss_meter.value()[0])
+            
             #     t = askADE(outputs, target)
             #     print('minDis=', t[0].item(), 'ADE=', t[1].item())
 
@@ -285,8 +303,8 @@ def train(epoch, learningRate, batchSize):
             # print('minDis=', minDis.item(), 'minADE=', minADE.item())
 
     # torch.save(vectorNet, 'VectorNet-test.model')
-    name = time.strftime('VectorNet_withtimestampe_%m%d_%H:%M:%S.model')
-    torch.save(vectorNet, os.path.join(config.model_save_path, name))
+    model_name = time.strftime(config.model_save_prefix + '%m%d_%H:%M:%S.model')
+    torch.save(vectorNet, os.path.join(config.model_save_path, model_name))
 
 
 def test(batchSize):
@@ -294,10 +312,16 @@ def test(batchSize):
     Test my model from file.
     :return: None
     """
+    train = load_train()
+    trainset = torch.utils.data.DataLoader(train, batch_size=batchSize)
     test = load_test()
     testset = torch.utils.data.DataLoader(test, batch_size=batchSize)
 
-    vectorNet = torch.load('VectorNet-test.model')
+    if config.load_model_path:
+        vectorNet = torch.load(config.load_model_path)
+    else:
+        print("model path not set!")
+        return
     vectorNet = vectorNet.to(device)
 
 
@@ -305,33 +329,42 @@ def test(batchSize):
     minADE = torch.zeros(1).to(device)
     minDis = torch.zeros(1).to(device)
     minDis[0] = -1
-    for data, target in testset:
+    lossfunc = torch.nn.MSELoss()
+    maelossfunc = torch.nn.L1Loss()
+    loss_meter = meter.AverageValueMeter()
+    mae_loss_meter = meter.AverageValueMeter()
+    loss_meter.reset()
+    for ii, (data, target) in tqdm(enumerate(trainset)):
         data = data.to(device)
         target = target.to(device)
-
         offset = data[:, -1, :]  # [0, 0, 0, 0, 0, maxX, maxY, ..., 0]
         data = data[:, 0:data.shape[1] - 1, :]
+        pID = data[0, 1:, -1].detach().cpu().numpy().copy()
 
-        outputs = vectorNet(data)
-
-        for i in range(0, outputs.shape[1], 2):
-            outputs[:, i] *= offset[:, 5]
-            outputs[:, i + 1] *= offset[:, 6]
-
+        outputs = vectorNet(data) # [batch size, len*2]
         loss = lossfunc(outputs, target)
-        # print("-----------")
-        # print(outputs)
-        # print(target)
-        t = askADE(outputs, target)
-        print('loss=', loss.item(), 'minDis=', t[0].item(), 'minADE=', t[1].item())
+        loss_meter.add(loss.item())
+        # loss.backward()
+        # print(iterator)
+        # print('loss=',loss.item())
+        # t = askADE(outputs, target)
+        # print('minDis=', t[0].item(), 'ADE=', t[1].item())
+        # optimizer.step()
+        # data[:, :, -1] = pID
+        if config.visual:
+            visualize(data.detach().cpu().numpy(), target.detach().cpu().numpy(), outputs.detach().cpu().numpy(), pID)
+        # if ii % 200 == 0 and ii > 0:
+        #     print("iterate [%d], train loss: [%f]"%(ii, loss_meter.value()[0]))
+        for i in range(0, outputs.shape[1], 2):
+            outputs[:, i] *= offset[:, 5] / 100
+            target[:, i] *= offset[:, 5] / 100
+            outputs[:, i + 1] *= offset[:, 6] / 100
+            target[:, i + 1] *= offset[:, 6] / 100
+        maeloss = maelossfunc(outputs, target)
+        mae_loss_meter.add(maeloss.item())
+    print("test loss: ", loss_meter.value()[0])
+    print("test mae loss: ", mae_loss_meter.value()[0])
 
-    #     if minDis.item() == -1 or minDis > t[0]:
-    #         minDis = t[0]
-    #         minADE = t[1]
-    # print('minDis=', minDis.item(), 'minADE=', minADE.item())
-    # ade += t
-    # ade /= len(testXList)
-    # print(ade)
 
 def testCV(batchSize):
     test = load_test()

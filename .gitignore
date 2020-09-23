@@ -1,8 +1,10 @@
 models/model/
 data/argo/
 checkpoints/
+data/origin/
+data/view/
 *.csv
 *.tar.gz
-*.pyc
-__pycache__/
+*-37.pyc
 *.model
+*/__pycache__/

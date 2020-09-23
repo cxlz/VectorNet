@@ -6,6 +6,7 @@ import pandas as pd
 import numpy as np
 import torch
 import config.configure as config
+from torch.utils import data
 
 # TEST_DATA_PATH = 'data/data/'
 # TRAIN_DATA_PATH = 'data/data/'
@@ -23,6 +24,8 @@ TRAIN_DATA_PATH = config.TRAIN_DATA_PATH
 #     TRAIN_FILE = files
 TRAIN_FILE = sorted(os.listdir(TRAIN_DATA_PATH))
 TEST_FILE = sorted(os.listdir(TEST_DATA_PATH))
+# TRAIN_FILE = np.random.choice(TRAIN_FILE, min(len(TRAIN_FILE), 128))
+# TEST_FILE = np.random.choice(TEST_FILE, min(len(TEST_FILE), 50))
 
 r"""
 data structure:
@@ -193,7 +196,7 @@ def load_train():
     Loading train set.
     :return: train set.
     """
-    return load_data(TRAIN_DATA_PATH, TRAIN_FILE[:5000])
+    return load_data(TRAIN_DATA_PATH, TRAIN_FILE)
 
 
 def load_test():
@@ -201,8 +204,19 @@ def load_test():
     Loading test set.
     :return: test set.
     """
-    return load_data(TEST_DATA_PATH, TEST_FILE[:500])
+    return load_data(TEST_DATA_PATH, TEST_FILE)
 
+class ArgoDataset(data.Dataset):
+    def __init__(self, DATA_PATH, nameList):
+        self.DATA_PATH = DATA_PATH
+        self.nameList = nameList
+        self.X, self.Y = load_data(self.DATA_PATH, self.nameList)
+
+    def __getitem__(self,index):
+        return self.X[index], self.Y[index]
+
+    def __len__(self):
+        return len(self.X)
 # if __name__ == '__main__':
 #     load_train()
 # np_arr = np.array([[1], [2], [3], [4]])

@@ -25,9 +25,13 @@
 #     grid_search = pkl.load(f)
 #     print(grid_search)
 import sys
-sys.path.remove("/opt/ros/kinetic/lib/python2.7/dist-packages")
+try:
+    sys.path.remove("/opt/ros/kinetic/lib/python2.7/dist-packages")
+except:
+    pass
 import pickle
 import os
+from tqdm import tqdm
 
 import pandas as pd
 import numpy as np
@@ -96,6 +100,10 @@ def work(name, file):
                 tmp.append(vec)
             if ans[i, 2] == 'AV':
                 AVX, AVY = ans[i-30, 3], ans[i-30, 4]
+                distance = np.sqrt(np.square(now[0][3] - now[19][3]) + np.square(now[0][4] - now[19][4]))
+                if distance < 1:
+                    print(name, distance)
+                    return -1
                 AVTIME = ans[i-30, 0]
 
     idList = avm.get_lane_ids_in_xy_bbox(AVX, AVY, city, 20)
@@ -140,15 +148,16 @@ def work(name, file):
     # print(tmp.shape)
     pf = pd.DataFrame(data=tmp)
     pf.to_csv(os.path.join(args.save_dir, 'data_' + file), header=False, index=False)
+    return 1
 
 
 # nameList = ['2645.csv','4791.csv']
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--data_dir", type=str, default="data/argo/forecasting_sample/data", required=False, help="data load dir")
+    parser.add_argument("-d", "--data_dir", type=str, default="/datastore/data/cxl/argoverse/train/data/", required=False, help="data load dir")
     parser.add_argument("-s", "--save_dir", type=str, default="data/argo/train_data", required=False, help="data save dir")
-    parser.add_argument("-n", "--num", type=int, default=500, required=False, help="num of files to load")
+    parser.add_argument("-n", "--num", type=int, default=5000, required=False, help="num of files to load")
     args = parser.parse_args()
     # DATA_DIR = 'data/argo/forecasting_sample/data/'
     # nameList = ['2645.csv','3700.csv','3828.csv','3861.csv']
@@ -157,10 +166,13 @@ if __name__ == "__main__":
     DATA_DIR = args.data_dir
     nameList = os.listdir(DATA_DIR)
     args.num = min(args.num, len(nameList))
-    for i, name in enumerate(nameList[:args.num]):
+    for i, name in tqdm(enumerate(nameList)):
         if i % 500 == 0 and i != 0:
             print("[%d] data loaded"%i)
-        work(os.path.join(DATA_DIR, name) ,name)
+        if work(os.path.join(DATA_DIR, name) ,name) > 0:
+            args.num -= 1
+        if args.num == 0:
+            break
 
 # df = pd.read_pickle(FEATURE_DIR + 'forecasting_features_test.pkl')
 
