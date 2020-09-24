@@ -206,7 +206,9 @@ def train(epoch, learningRate, batchSize):
     :return: None
     """
 
+    print("train data path: [%s], train data size [%d]"%(TRAIN_DATA_PATH, len(TRAIN_FILE)))
     train = ArgoDataset(TRAIN_DATA_PATH, TRAIN_FILE)
+    print("test data path: [%s], test data size [%d]"%(TEST_DATA_PATH, len(TEST_FILE)))
     trainset = torch.utils.data.DataLoader(train, batch_size=batchSize, shuffle=True, drop_last=False, collate_fn=my_collate_fn)
     test = ArgoDataset(TEST_DATA_PATH, TEST_FILE)
     testset = torch.utils.data.DataLoader(test, batch_size=batchSize, collate_fn=my_collate_fn)

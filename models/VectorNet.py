@@ -26,6 +26,7 @@ class VectorNet(nn.Module):
         layersNumber = 3
         # self.subGraphs = clones(SubGraph(layersNumber=3, len=len), 3)
         self.subGraphs = SubGraph(layersNumber=layersNumber, len=len)
+        self.subGraphs2 = SubGraph(layersNumber=layersNumber, len=len)
         # self.pLen = len
         self.pLen = len * (2 ** layersNumber)
         self.globalGraph = Attention(C=self.pLen)
@@ -51,6 +52,7 @@ class VectorNet(nn.Module):
         """
         data = data.permute(1, 0, 2)  # [vNumber, batch size, len]
         id = data[0, :, 0].long()
+        m_id = data[0, 0, 5]
         pID = data[:, 0, -1].long()
         data[:, :, -1] = 0
 
@@ -71,7 +73,10 @@ class VectorNet(nn.Module):
                 # tmp's shape is [batch size, pvNumber, Len]
                 # subGraphId = int(data[i, 0, len - 1].item())
                 # print(tmp.shape)
-                p = self.subGraphs(tmp)  # [batch size, pLen]
+                if pID[i] < m_id:
+                    p = self.subGraphs(tmp)  # [batch size, pLen]
+                else:
+                    p = self.subGraphs2(tmp)  # [batch size, pLen]
                 p.unsqueeze_(1)  # [batch size, 1, pLen]
                 P = torch.cat((P, p), dim=1)
                 # print('2 VectorNet',i,j, 'subGraphId =',subGraphId)

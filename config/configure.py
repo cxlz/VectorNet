@@ -26,7 +26,7 @@ epoch = 25
 
 
 visual = True
-save_view = True
+save_view = False
 save_view_path = "data/view/no_slow_obj_19"
 if not os.path.exists(save_view_path):
     os.makedirs(save_view_path)

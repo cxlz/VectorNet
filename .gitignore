@@ -7,5 +7,5 @@ data/view/
 *.tar.gz
 *-37.pyc
 *.model
-*/__pycache__/
+__pycache__/
 0/
