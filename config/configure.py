@@ -13,9 +13,9 @@ map_search_radius = 20
 TEST_DATA_PATH = 'data/argo/test_data/'
 TRAIN_DATA_PATH = 'data/argo/train_data/'
 model_save_path = "models/model"
-model_save_prefix = "VectorNet_no_slow_obj_"
+model_save_prefix = "VectorNet_no_slow_obj_subgraph_"
 load_model = False
-load_model_path = "models/model/VectorNet_no_slow_obj_19_0924_01:57:09.model"
+load_model_path = "models/model/VectorNet_no_slow_obj_19_0924_14:16:03.model"
 # load_model_path = "models/model/VectorNet_no_slow_obj_19_0924_01:57:09.model"
 
 
@@ -26,7 +26,7 @@ epoch = 25
 
 
 visual = True
-save_view = True
+save_view = False
 save_view_path = "data/view/no_slow_obj_19"
 if not os.path.exists(save_view_path):
     os.makedirs(save_view_path)

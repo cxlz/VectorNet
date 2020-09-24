@@ -186,7 +186,11 @@ def visualize(data, labels, prediction, pID):
         
         line_color = (0, 0, 255)
         for j in range(pred.shape[0] // 2 - 1):
-            img = cv2.circle(img, (pred[j * 2] + img_half_scale, pred[j * 2 + 1] + img_half_scale), 3, line_color, thickness= -1)
+            try:
+                img = cv2.circle(img, (pred[j * 2] + img_half_scale, pred[j * 2 + 1] + img_half_scale), 3, line_color, thickness= -1)
+            except:
+                print(pred[j*2:j*2 + 2])
+                pass
 
             # img = cv2.line(img, (label[j * 2] + img_half_scale, label[j * 2 + 1] + img_half_scale), 
             #                 (label[j * 2 + 2] + img_half_scale, label[j * 2 + 3] + img_half_scale), line_color, thickness=2)
@@ -240,7 +244,7 @@ def train(epoch, learningRate, batchSize):
             pID = data[0, 1:, -1].detach().cpu().numpy().copy()
             
             outputs = vectorNet(data) # [batch size, len*2]
-            loss = lossfunc(outputs, target)
+            loss = lossfunc(outputs, torch.tanh(target))
             loss_meter.add(loss.item())
             loss.backward()
             # print(iterator)
@@ -250,7 +254,7 @@ def train(epoch, learningRate, batchSize):
             optimizer.step()
             # data[:, :, -1] = pID
             if config.visual:
-                visualize(data.detach().cpu().numpy(), target.detach().cpu().numpy(), outputs.detach().cpu().numpy(), pID)
+                visualize(data.detach().cpu().numpy(), target.detach().cpu().numpy(), torch.atanh(outputs.detach().cpu()).numpy(), pID)
             if ii % 200 == 0 and ii > 0:
                 print("iterate [%d], train loss: [%f]"%(ii, loss_meter.value()[0]))
             for i in range(0, outputs.shape[1], 2):

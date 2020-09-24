@@ -93,10 +93,10 @@ def load_data(DATA_PATH, nameList):
                     if i - j + 1 != 49:
                         break
                     maxSize[id] = np.max([maxSize[id], 19])
-                    if ans[j, 0] > 0:
-                        dx = -1
-                    if ans[j, 1] > 0:
-                        dy = -1
+                    # if ans[j, 0] > 0:
+                    #     dx = -1
+                    # if ans[j, 1] > 0:
+                    #     dy = -1
 
                     for l in range(0, 19):
                         tx.append(ans[j])
