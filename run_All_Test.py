@@ -113,7 +113,7 @@ def load_data(DATA_PATH, nameList):
     return train
 
 
-vectorNet = torch.load('VectorNet-test.model')
+vectorNet = torch.load('VectorNet0001-big.model')
 vectorNet = vectorNet.to(device)
 
 

@@ -14,7 +14,10 @@ TEST_DATA_PATH = 'data/argo/test_data/'
 TRAIN_DATA_PATH = 'data/argo/train_data/'
 model_save_path = "models/model"
 model_save_prefix = "VectorNet_no_slow_obj_"
-load_model_path = "models/model/VectorNet_withtimestampe_0922_22:52:46.model"
+load_model = False
+load_model_path = "models/model/VectorNet_no_slow_obj_19_0924_01:57:09.model"
+# load_model_path = "models/model/VectorNet_no_slow_obj_19_0924_01:57:09.model"
+
 
 lr = 0.001
 lr_decay = 0.5
@@ -24,7 +27,7 @@ epoch = 25
 
 visual = True
 save_view = True
-save_view_path = "data/view/withtimestamp"
+save_view_path = "data/view/no_slow_obj_19"
 if not os.path.exists(save_view_path):
     os.makedirs(save_view_path)
 

@@ -18,10 +18,20 @@ from torchnet import meter
 from models.VectorNet import VectorNet
 from models.VectorNet import VectorNetWithPredicting
 # from config.configure import device
-from data.dataloader import load_train, load_test
+from data.dataloader import load_train, load_test, ArgoDataset, my_collate_fn
 import config.configure as config
 
 device = config.device
+TEST_DATA_PATH = config.TEST_DATA_PATH
+TRAIN_DATA_PATH = config.TRAIN_DATA_PATH
+
+# for root, dirs, files in os.walk(TEST_DATA_PATH):
+#     TEST_FILE = files
+
+# for root, dirs, files in os.walk(TRAIN_DATA_PATH):
+#     TRAIN_FILE = files
+TRAIN_FILE = sorted(os.listdir(TRAIN_DATA_PATH))
+TEST_FILE = sorted(os.listdir(TEST_DATA_PATH))
 
 def askADE(a, b):
     r"""
@@ -196,12 +206,11 @@ def train(epoch, learningRate, batchSize):
     :return: None
     """
 
-    train = load_train()
-    trainset = torch.utils.data.DataLoader(train, batch_size=batchSize)
-    test = load_test()
-    testset = torch.utils.data.DataLoader(test, batch_size=batchSize)
-
-    if config.load_model_path:
+    train = ArgoDataset(TRAIN_DATA_PATH, TRAIN_FILE)
+    trainset = torch.utils.data.DataLoader(train, batch_size=batchSize, shuffle=True, drop_last=False, collate_fn=my_collate_fn)
+    test = ArgoDataset(TEST_DATA_PATH, TEST_FILE)
+    testset = torch.utils.data.DataLoader(test, batch_size=batchSize, collate_fn=my_collate_fn)
+    if config.load_model:
         vectorNet = torch.load(config.load_model_path)
     else:
         vectorNet = VectorNetWithPredicting(len=9, timeStampNumber=30)
@@ -225,13 +234,11 @@ def train(epoch, learningRate, batchSize):
         for ii, (data, target) in tqdm(enumerate(trainset)):
             data = data.to(device)
             target = target.to(device)
-
             optimizer.zero_grad()
-
             offset = data[:, -1, :]  # [0, 0, 0, 0, 0, maxX, maxY, ..., 0]
             data = data[:, 0:data.shape[1] - 1, :]
             pID = data[0, 1:, -1].detach().cpu().numpy().copy()
-
+            
             outputs = vectorNet(data) # [batch size, len*2]
             loss = lossfunc(outputs, target)
             loss_meter.add(loss.item())
@@ -280,17 +287,19 @@ def train(epoch, learningRate, batchSize):
 
                 outputs = vectorNet(data)
 
-                for i in range(0, outputs.shape[1], 2):
-                    outputs[:, i] *= offset[:, 5] / 100
-                    target[:, i] *= offset[:, 5] / 100
-                    outputs[:, i + 1] *= offset[:, 6] / 100
-                    target[:, i + 1] *= offset[:, 6] / 100
 
                 # print(outputs)
                 # print(target)
                 loss = lossfunc(outputs, target)
                 # print('loss=', loss.item())
                 loss_meter.add(loss.item())
+                for i in range(0, outputs.shape[1], 2):
+                    outputs[:, i] *= offset[:, 5] / 100
+                    target[:, i] *= offset[:, 5] / 100
+                    outputs[:, i + 1] *= offset[:, 6] / 100
+                    target[:, i + 1] *= offset[:, 6] / 100
+                maeloss = maelossfunc(outputs, target)
+                mae_loss_meter.add(maeloss.item())
             print("test loss: ", loss_meter.value()[0])
             
             #     t = askADE(outputs, target)
@@ -312,12 +321,14 @@ def test(batchSize):
     Test my model from file.
     :return: None
     """
-    train = load_train()
-    trainset = torch.utils.data.DataLoader(train, batch_size=batchSize)
-    test = load_test()
-    testset = torch.utils.data.DataLoader(test, batch_size=batchSize)
+    train = ArgoDataset(TRAIN_DATA_PATH, TRAIN_FILE)
+    trainset = torch.utils.data.DataLoader(train, batch_size=batchSize, shuffle=True, drop_last=False, collate_fn=my_collate_fn)
+    test = ArgoDataset(TEST_DATA_PATH, TEST_FILE)
+    testset = torch.utils.data.DataLoader(test, batch_size=batchSize, collate_fn=my_collate_fn)
 
+    torch.nn.Module.dump_patches = True
     if config.load_model_path:
+        print("loading model: [%s]"%config.load_model_path)
         vectorNet = torch.load(config.load_model_path)
     else:
         print("model path not set!")
@@ -334,7 +345,7 @@ def test(batchSize):
     loss_meter = meter.AverageValueMeter()
     mae_loss_meter = meter.AverageValueMeter()
     loss_meter.reset()
-    for ii, (data, target) in tqdm(enumerate(trainset)):
+    for ii, (data, target) in tqdm(enumerate(testset)):
         data = data.to(device)
         target = target.to(device)
         offset = data[:, -1, :]  # [0, 0, 0, 0, 0, maxX, maxY, ..., 0]
@@ -344,6 +355,7 @@ def test(batchSize):
         outputs = vectorNet(data) # [batch size, len*2]
         loss = lossfunc(outputs, target)
         loss_meter.add(loss.item())
+        
         # loss.backward()
         # print(iterator)
         # print('loss=',loss.item())

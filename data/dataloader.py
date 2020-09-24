@@ -57,7 +57,7 @@ def load_data(DATA_PATH, nameList):
     type_ID = 4
     maxSize = np.zeros(1000)
     offset = []
-    for name in tqdm(nameList):
+    for name in nameList:
         ans = pd.read_csv(DATA_PATH + name, header=None)
         ans = np.array(ans)
         x, tx, y = [], [], []
@@ -106,9 +106,12 @@ def load_data(DATA_PATH, nameList):
                         y.append(ans[j, 3])
                         j += 1
                 else:
-                    maxSize[id] = np.max([maxSize[id], i - j + 1])
+                    maxSize[id] = np.max([maxSize[id], min(19, i - j + 1)])
+                    count = 0
                     while j <= i:
-                        tx.append(ans[j])
+                        if count < 19:
+                            tx.append(ans[j])
+                            count += 1   
                         j += 1
         # print(dx, dy, name)
 
@@ -160,8 +163,8 @@ def load_data(DATA_PATH, nameList):
             while j < X[it].shape[0] and X[it][j, polyline_ID] == i:
                 x.append(X[it][j])
                 lst = X[it][j]
-                j += 1
                 tmp -= 1
+                j += 1
             while tmp > 0:
                 x.append(lst)
                 tmp -= 1
@@ -186,9 +189,9 @@ def load_data(DATA_PATH, nameList):
 
     XX = XX.float()
     YY = YY.float()
-
-    train = torch.utils.data.TensorDataset(XX, YY)
-    return train
+    return XX, YY
+    # train = torch.utils.data.TensorDataset(XX, YY)
+    # return train
 
 
 def load_train():
@@ -196,7 +199,7 @@ def load_train():
     Loading train set.
     :return: train set.
     """
-    return load_data(TRAIN_DATA_PATH, TRAIN_FILE)
+    return load_data(TRAIN_DATA_PATH, TRAIN_FILE[:500])
 
 
 def load_test():
@@ -206,17 +209,28 @@ def load_test():
     """
     return load_data(TEST_DATA_PATH, TEST_FILE)
 
+
+def my_collate_fn(batch_data):
+    DATA_PATH = batch_data[0][0]
+    nameList = []
+    for path, name in batch_data:
+        nameList.append(name)
+    X, Y = load_data(DATA_PATH, nameList)
+    return X, Y
+
+
 class ArgoDataset(data.Dataset):
     def __init__(self, DATA_PATH, nameList):
         self.DATA_PATH = DATA_PATH
         self.nameList = nameList
-        self.X, self.Y = load_data(self.DATA_PATH, self.nameList)
+        # self.X, self.Y = load_data(self.DATA_PATH, self.nameList)
 
     def __getitem__(self,index):
-        return self.X[index], self.Y[index]
+        return self.DATA_PATH, self.nameList[index]
+        # return self.X[index], self.Y[index]
 
     def __len__(self):
-        return len(self.X)
+        return len(self.nameList)
 # if __name__ == '__main__':
 #     load_train()
 # np_arr = np.array([[1], [2], [3], [4]])
