@@ -11,11 +11,11 @@ feature_length = 9
 map_search_radius = 20
 
 TEST_DATA_PATH = 'data/argo/test_data/'
-TRAIN_DATA_PATH = 'data/argo/train_data/'
+TRAIN_DATA_PATH = 'data/argo/turn/train_data/'
 model_save_path = "models/model"
 model_save_prefix = "VectorNet_no_slow_obj_"
 load_model = False
-load_model_path = "models/model/VectorNet_no_slow_obj_19_0924_01:57:09.model"
+load_model_path = "models/model/VectorNet_no_slow_obj_0924_16:39:02.model"
 # load_model_path = "models/model/VectorNet_no_slow_obj_19_0924_01:57:09.model"
 
 

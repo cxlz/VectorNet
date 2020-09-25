@@ -140,13 +140,14 @@ def visualize(data, labels, prediction, pID):
     img_half_scale = round(img_half_scale / img_resolution)
     global count
     for traj, label, pred in zip(data, labels, prediction):
-        tmp = traj[0]
+        head_line = traj[0]
         traj = traj[1:, :]
-        idx = tmp[0]
-        # AVX = tmp[1]
-        # AVY = tmp[2]
-        maxX = tmp[3] /img_resolution / 100
-        maxY = tmp[4] /img_resolution / 100
+        idx = head_line[0]
+        # AVX = head_line[1]
+        # AVY = head_line[2]
+        maxX = head_line[3] /img_resolution / 100
+        maxY = head_line[4] /img_resolution / 100
+        m_id = int(head_line[5])
         traj[:, 0:3:2] *= maxX
         traj[:, 1:4:2] *= maxY
         label[0:-2:2] *= maxX
@@ -159,25 +160,25 @@ def visualize(data, labels, prediction, pID):
         label = label.astype("int")
         pred = pred.astype("int")
         img = np.ones((img_half_scale * 2, img_half_scale * 2, 3)) * 255
-        for i in range(traj.shape[0] - 2, -1, -1):
-            if traj[i, 0] == 0 and traj[i + 1, 0] == 0:
+            
+        for i in range(traj.shape[0] - 1, -1, -1):
+            if traj[i, 0] == 0 and traj[i, 2] == 0:
                 continue
             if traj[i, 4] == 2:
                 line_color = (0, 0, 0)
                 # img = cv2.circle(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale), 1, line_color)
-                if pID[i] == pID[i + 1] and traj[i + 1, 0] != 0:
+                if traj[i, 0] != 0 or traj[i, 2] != 0:
                     img = cv2.line(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale),
-                                    (traj[i + 1, 0] + img_half_scale, traj[i + 1, 1] + img_half_scale), line_color, thickness=1)
+                                    (traj[i, 2] + img_half_scale, traj[i, 3] + img_half_scale), line_color, thickness=1)
+            elif pID[i] == idx:
+                line_color = (255, 0, 0)
+                if traj[i, 0] != 0 or traj[i, 2] != 0:
+                    img = cv2.line(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale),
+                                    (traj[i, 2] + img_half_scale, traj[i, 3] + img_half_scale), line_color, thickness=2)
+                # img = cv2.circle(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale), 1, line_color, lineType=8)
             else:
-                if pID[i] == idx:
-                    line_color = (255, 0, 0)
-                    if pID[i] == pID[i + 1] and traj[i + 1, 0] != 0:
-                        img = cv2.line(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale),
-                                        (traj[i + 1, 0] + img_half_scale, traj[i + 1, 1] + img_half_scale), line_color, thickness=2)
-                    # img = cv2.circle(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale), 1, line_color, lineType=8)
-                else:
-                    line_color = (0, 255, 0)
-                    img = cv2.circle(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale), 1, line_color, thickness= -1)
+                line_color = (0, 255, 0)
+                img = cv2.circle(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale), 1, line_color, thickness= -1)
             
 
         line_color = (255, 0, 0)
@@ -191,7 +192,7 @@ def visualize(data, labels, prediction, pID):
             # img = cv2.line(img, (label[j * 2] + img_half_scale, label[j * 2 + 1] + img_half_scale), 
             #                 (label[j * 2 + 2] + img_half_scale, label[j * 2 + 3] + img_half_scale), line_color, thickness=2)
         cv2.imshow("img", img)
-        cv2.waitKey(1)
+        cv2.waitKey(0)
         if config.save_view:
             cv2.imwrite(os.path.join(config.save_view_path, str(count) + ".jpg"), img)
             count += 1
@@ -213,7 +214,11 @@ def train(epoch, learningRate, batchSize):
     test = ArgoDataset(TEST_DATA_PATH, TEST_FILE)
     testset = torch.utils.data.DataLoader(test, batch_size=batchSize, collate_fn=my_collate_fn)
     if config.load_model:
-        vectorNet = torch.load(config.load_model_path)
+        try:
+            vectorNet = torch.load(config.load_model_path)
+        except:
+            print("model path error.")
+            return
     else:
         vectorNet = VectorNetWithPredicting(len=9, timeStampNumber=30)
 
@@ -329,15 +334,15 @@ def test(batchSize):
     testset = torch.utils.data.DataLoader(test, batch_size=batchSize, collate_fn=my_collate_fn)
 
     torch.nn.Module.dump_patches = True
-    if config.load_model_path:
+    try:
         print("loading model: [%s]"%config.load_model_path)
         vectorNet = torch.load(config.load_model_path)
-    else:
-        print("model path not set!")
+    except:
+        print("model path error!")
         return
     vectorNet = vectorNet.to(device)
 
-
+    config.save_view = True
     lossfunc = torch.nn.MSELoss()
     minADE = torch.zeros(1).to(device)
     minDis = torch.zeros(1).to(device)
@@ -439,8 +444,8 @@ if __name__ == '__main__':
     parser.add_argument("--epoch", dest="epoch", default=25, type=int)
     parser.add_argument("--learning_rate", dest="lr", default=0.001, type=float)
     args = parser.parse_args()
-    train(epoch=args.epoch, learningRate=args.lr, batchSize=args.batch_size)
-    # test(batchSize=args.batch_size)
+    # train(epoch=args.epoch, learningRate=args.lr, batchSize=args.batch_size)
+    test(batchSize=args.batch_size)
     # testCV(batchSize=args.batch_size)
 
     # random_train(epoch=args.epoch, learningRate=args.lr, batchSize=args.batch_size)
