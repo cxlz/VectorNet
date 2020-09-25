@@ -107,7 +107,7 @@ class VectorNetWithPredicting(nn.Module):
         self.vectorNet = VectorNet(len=len)
         self.trajDecoder = MLP(inputSize=self.vectorNet.pLen,
                                    outputSize=timeStampNumber * 2,
-                                   noReLU=False)
+                                   noReLU=True)
 
 
     def forward(self, x):
@@ -118,4 +118,5 @@ class VectorNetWithPredicting(nn.Module):
         """
         x = self.vectorNet(x)
         x = self.trajDecoder(x)
+        x = torch.tanh(x)
         return x
