@@ -213,7 +213,11 @@ def train(epoch, learningRate, batchSize):
     test = ArgoDataset(TEST_DATA_PATH, TEST_FILE)
     testset = torch.utils.data.DataLoader(test, batch_size=batchSize, collate_fn=my_collate_fn)
     if config.load_model:
-        vectorNet = torch.load(config.load_model_path)
+        try:
+            print("loading model from [%s]"%config.load_model_path)
+            vectorNet = torch.load(config.load_model_path)
+        except:
+            print("model path error.")
     else:
         vectorNet = VectorNetWithPredicting(len=9, timeStampNumber=30)
 
@@ -231,7 +235,7 @@ def train(epoch, learningRate, batchSize):
     mae_loss_meter = meter.AverageValueMeter()
     pre_loss = float("inf")
     for iterator in range(epoch):
-        print("epoch [%d]: learning rate [%f]"%(iterator, lr))
+        print("epoch [%d]: learning rate [%.10f]"%(iterator, lr))
         loss_meter.reset()
         for ii, (data, target) in tqdm(enumerate(trainset)):
             data = data.to(device)
@@ -242,7 +246,7 @@ def train(epoch, learningRate, batchSize):
             pID = data[0, 1:, -1].detach().cpu().numpy().copy()
             
             outputs = vectorNet(data) # [batch size, len*2]
-            loss = lossfunc(outputs, target)
+            loss = lossfunc(outputs, torch.tanh(target))
             loss_meter.add(loss.item())
             loss.backward()
             # print(iterator)
@@ -251,8 +255,9 @@ def train(epoch, learningRate, batchSize):
             # print('minDis=', t[0].item(), 'ADE=', t[1].item())
             optimizer.step()
             # data[:, :, -1] = pID
+            outputs = torch.atanh(outputs.detach())
             if config.visual:
-                visualize(data.detach().cpu().numpy(), target.detach().cpu().numpy(), outputs.detach().cpu().numpy(), pID)
+                visualize(data.detach().cpu().numpy(), target.detach().cpu().numpy(), outputs.cpu().numpy(), pID)
             if ii % 200 == 0 and ii > 0:
                 print("iterate [%d], train loss: [%f]"%(ii, loss_meter.value()[0]))
             for i in range(0, outputs.shape[1], 2):
@@ -270,6 +275,8 @@ def train(epoch, learningRate, batchSize):
             torch.save(vectorNet, os.path.join(config.model_save_path, model_name))
         else:
             lr *= config.lr_decay
+            if lr < 1e-8:
+                break
             for param_group in optimizer.param_groups:
                 param_group['lr'] = lr
         if (iterator + 1) % 5 == 0:
@@ -295,6 +302,7 @@ def train(epoch, learningRate, batchSize):
                 loss = lossfunc(outputs, target)
                 # print('loss=', loss.item())
                 loss_meter.add(loss.item())
+                outputs = torch.atanh(outputs.detach())
                 for i in range(0, outputs.shape[1], 2):
                     outputs[:, i] *= offset[:, 5] / 100
                     target[:, i] *= offset[:, 5] / 100
@@ -323,16 +331,16 @@ def test(batchSize):
     Test my model from file.
     :return: None
     """
-    train = ArgoDataset(TRAIN_DATA_PATH, TRAIN_FILE)
+    train = ArgoDataset(TRAIN_DATA_PATH, TRAIN_FILE[:500])
     trainset = torch.utils.data.DataLoader(train, batch_size=batchSize, shuffle=True, drop_last=False, collate_fn=my_collate_fn)
     test = ArgoDataset(TEST_DATA_PATH, TEST_FILE)
     testset = torch.utils.data.DataLoader(test, batch_size=batchSize, collate_fn=my_collate_fn)
-
+    config.save_view = True
     torch.nn.Module.dump_patches = True
-    if config.load_model_path:
+    try:
         print("loading model: [%s]"%config.load_model_path)
         vectorNet = torch.load(config.load_model_path)
-    else:
+    except:
         print("model path not set!")
         return
     vectorNet = vectorNet.to(device)
@@ -347,7 +355,7 @@ def test(batchSize):
     loss_meter = meter.AverageValueMeter()
     mae_loss_meter = meter.AverageValueMeter()
     loss_meter.reset()
-    for ii, (data, target) in tqdm(enumerate(testset)):
+    for ii, (data, target) in tqdm(enumerate(trainset)):
         data = data.to(device)
         target = target.to(device)
         offset = data[:, -1, :]  # [0, 0, 0, 0, 0, maxX, maxY, ..., 0]
@@ -355,7 +363,7 @@ def test(batchSize):
         pID = data[0, 1:, -1].detach().cpu().numpy().copy()
 
         outputs = vectorNet(data) # [batch size, len*2]
-        loss = lossfunc(outputs, target)
+        loss = lossfunc(outputs, torch.tanh(target))
         loss_meter.add(loss.item())
         
         # loss.backward()
@@ -365,8 +373,9 @@ def test(batchSize):
         # print('minDis=', t[0].item(), 'ADE=', t[1].item())
         # optimizer.step()
         # data[:, :, -1] = pID
+        outputs = torch.atanh(outputs.detach())
         if config.visual:
-            visualize(data.detach().cpu().numpy(), target.detach().cpu().numpy(), outputs.detach().cpu().numpy(), pID)
+            visualize(data.detach().cpu().numpy(), target.detach().cpu().numpy(), outputs.cpu().numpy(), pID)
         # if ii % 200 == 0 and ii > 0:
         #     print("iterate [%d], train loss: [%f]"%(ii, loss_meter.value()[0]))
         for i in range(0, outputs.shape[1], 2):
@@ -439,8 +448,8 @@ if __name__ == '__main__':
     parser.add_argument("--epoch", dest="epoch", default=25, type=int)
     parser.add_argument("--learning_rate", dest="lr", default=0.001, type=float)
     args = parser.parse_args()
-    train(epoch=args.epoch, learningRate=args.lr, batchSize=args.batch_size)
-    # test(batchSize=args.batch_size)
+    # train(epoch=config.epoch, learningRate=config.lr, batchSize=config.batch_size)
+    test(batchSize=args.batch_size)
     # testCV(batchSize=args.batch_size)
 
     # random_train(epoch=args.epoch, learningRate=args.lr, batchSize=args.batch_size)
