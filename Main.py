@@ -134,12 +134,13 @@ def random_train(epoch, learningRate, batchSize):
         print(iterator)
 
 count = 0
-def visualize(data, labels, prediction, pID):
+def visualize(data, labels, prediction, att, pID):
+    att = att[:, 0, :]
     img_half_scale = 20
     img_resolution = 0.1
     img_half_scale = round(img_half_scale / img_resolution)
     global count
-    for traj, label, pred in zip(data, labels, prediction):
+    for traj, label, pred, a in zip(data, labels, prediction, att):
         head_line = traj[0]
         traj = traj[1:, :]
         idx = head_line[0]
@@ -160,39 +161,50 @@ def visualize(data, labels, prediction, pID):
         label = label.astype("int")
         pred = pred.astype("int")
         img = np.ones((img_half_scale * 2, img_half_scale * 2, 3)) * 255
-            
+        # att_sum = np.sum(att)
+        cur_id = 1  
         for i in range(traj.shape[0] - 1, -1, -1):
+            thickness = 1
+            if a[-cur_id] > 0.5:
+                thickness = 2
+                print("point: ", traj[i, :])
+            if i > 0 and pID[i] != pID[i - 1]:
+                cur_id += 1
+            # if a[-cur_id] > 0.5:
+            #     print(traj[i, 0:4])
             if traj[i, 0] == 0 and traj[i, 2] == 0:
                 continue
             if traj[i, 4] == 2:
-                line_color = (0, 0, 0)
+                att_color = int(a[-cur_id] * 255)
+                line_color = (0, 0, att_color)
                 # img = cv2.circle(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale), 1, line_color)
                 if traj[i, 0] != 0 or traj[i, 2] != 0:
                     img = cv2.line(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale),
-                                    (traj[i, 2] + img_half_scale, traj[i, 3] + img_half_scale), line_color, thickness=1)
+                                    (traj[i, 2] + img_half_scale, traj[i, 3] + img_half_scale), line_color, thickness=thickness)
             elif pID[i] == idx:
                 line_color = (255, 0, 0)
                 if traj[i, 0] != 0 or traj[i, 2] != 0:
                     img = cv2.line(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale),
-                                    (traj[i, 2] + img_half_scale, traj[i, 3] + img_half_scale), line_color, thickness=2)
+                                    (traj[i, 2] + img_half_scale, traj[i, 3] + img_half_scale), line_color, thickness=thickness)
                 # img = cv2.circle(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale), 1, line_color, lineType=8)
             else:
                 line_color = (0, 255, 0)
-                img = cv2.circle(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale), 1, line_color, thickness= -1)
+                img = cv2.circle(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale), thickness, line_color, thickness= -1)
             
-
+        img1 = img.copy()
         line_color = (255, 0, 0)
         for j in range(label.shape[0] // 2 - 1):
-            img = cv2.circle(img, (label[j * 2] + img_half_scale, label[j * 2 + 1] + img_half_scale), 3, line_color, thickness= 2)
+            img1 = cv2.circle(img1, (label[j * 2] + img_half_scale, label[j * 2 + 1] + img_half_scale), 3, line_color, thickness= 2)
         
         line_color = (0, 0, 255)
         for j in range(pred.shape[0] // 2 - 1):
-            img = cv2.circle(img, (pred[j * 2] + img_half_scale, pred[j * 2 + 1] + img_half_scale), 3, line_color, thickness= -1)
+            img1 = cv2.circle(img1, (pred[j * 2] + img_half_scale, pred[j * 2 + 1] + img_half_scale), 3, line_color, thickness= -1)
 
-            # img = cv2.line(img, (label[j * 2] + img_half_scale, label[j * 2 + 1] + img_half_scale), 
+            # img1 = cv2.line(img1, (label[j * 2] + img_half_scale, label[j * 2 + 1] + img_half_scale), 
             #                 (label[j * 2 + 2] + img_half_scale, label[j * 2 + 3] + img_half_scale), line_color, thickness=2)
+        cv2.imshow("img1", img1)
         cv2.imshow("img", img)
-        cv2.waitKey(0)
+        cv2.waitKey(1)
         if config.save_view:
             cv2.imwrite(os.path.join(config.save_view_path, str(count) + ".jpg"), img)
             count += 1
@@ -243,11 +255,11 @@ def train(epoch, learningRate, batchSize):
             data = data.to(device)
             target = target.to(device)
             optimizer.zero_grad()
-            offset = data[:, -1, :]  # [0, 0, 0, 0, 0, maxX, maxY, ..., 0]
-            data = data[:, 0:data.shape[1] - 1, :]
+            offset = data[:, 0, :]  # [0, 0, 0, 0, 0, maxX, maxY, ..., 0]
+            # data = data[:, 0:data.shape[1] - 1, :]
             pID = data[0, 1:, -1].detach().cpu().numpy().copy()
             
-            outputs = vectorNet(data) # [batch size, len*2]
+            outputs, att = vectorNet(data) # [batch size, len*2]
             loss = lossfunc(outputs, torch.tanh(target))
             loss_meter.add(loss.item())
             loss.backward()
@@ -259,14 +271,15 @@ def train(epoch, learningRate, batchSize):
             # data[:, :, -1] = pID
             outputs = torch.atanh(outputs.detach())
             if config.visual:
-                visualize(data.detach().cpu().numpy(), target.detach().cpu().numpy(), outputs.cpu().numpy(), pID)
+                visualize(data.detach().cpu().numpy(), target.detach().cpu().numpy(), 
+                            outputs.cpu().numpy(), att.detach().cpu().numpy(), pID)
             if ii % 200 == 0 and ii > 0:
                 print("iterate [%d], train loss: [%f]"%(ii, loss_meter.value()[0]))
             for i in range(0, outputs.shape[1], 2):
-                outputs[:, i] *= offset[:, 5] / 100
-                target[:, i] *= offset[:, 5] / 100
-                outputs[:, i + 1] *= offset[:, 6] / 100
-                target[:, i + 1] *= offset[:, 6] / 100
+                outputs[:, i] *= offset[:, 3] / 100
+                target[:, i] *= offset[:, 3] / 100
+                outputs[:, i + 1] *= offset[:, 4] / 100
+                target[:, i + 1] *= offset[:, 4] / 100
             maeloss = maelossfunc(outputs, target)
             mae_loss_meter.add(maeloss.item())
         print("train loss: ", loss_meter.value()[0])
@@ -293,10 +306,10 @@ def train(epoch, learningRate, batchSize):
                 data = data.to(device)
                 target = target.to(device)
 
-                offset = data[:, -1, :]  # [0, 0, 0, 0, 0, maxX, maxY, ..., 0]
-                data = data[:, 0:data.shape[1] - 1, :]
+                offset = data[:, 0, :]  # [0, 0, 0, 0, 0, maxX, maxY, ..., 0]
+                # data = data[:, 0:data.shape[1] - 1, :]
 
-                outputs = vectorNet(data)
+                outputs, att = vectorNet(data)
 
 
                 # print(outputs)
@@ -306,10 +319,10 @@ def train(epoch, learningRate, batchSize):
                 loss_meter.add(loss.item())
                 outputs = torch.atanh(outputs.detach())
                 for i in range(0, outputs.shape[1], 2):
-                    outputs[:, i] *= offset[:, 5] / 100
-                    target[:, i] *= offset[:, 5] / 100
-                    outputs[:, i + 1] *= offset[:, 6] / 100
-                    target[:, i + 1] *= offset[:, 6] / 100
+                    outputs[:, i] *= offset[:, 3] / 100
+                    target[:, i] *= offset[:, 3] / 100
+                    outputs[:, i + 1] *= offset[:, 4] / 100
+                    target[:, i + 1] *= offset[:, 4] / 100
                 maeloss = maelossfunc(outputs, target)
                 mae_loss_meter.add(maeloss.item())
             print("test loss: ", loss_meter.value()[0])
@@ -341,13 +354,14 @@ def test(batchSize):
     torch.nn.Module.dump_patches = True
     try:
         print("loading model: [%s]"%config.load_model_path)
-        vectorNet = torch.load(config.load_model_path)
+        vectorNet = torch.load(config.load_model_path, map_location=config.map_location)
     except:
         print("model path error!")
         return
     vectorNet = vectorNet.to(device)
 
     config.save_view = True
+    print("save view path: [%s]"%config.save_view_path)
     lossfunc = torch.nn.MSELoss()
     minADE = torch.zeros(1).to(device)
     minDis = torch.zeros(1).to(device)
@@ -360,11 +374,11 @@ def test(batchSize):
     for ii, (data, target) in tqdm(enumerate(trainset)):
         data = data.to(device)
         target = target.to(device)
-        offset = data[:, -1, :]  # [0, 0, 0, 0, 0, maxX, maxY, ..., 0]
+        offset = data[:, 0, :]  # [0, 0, 0, 0, 0, maxX, maxY, ..., 0]
         data = data[:, 0:data.shape[1] - 1, :]
         pID = data[0, 1:, -1].detach().cpu().numpy().copy()
 
-        outputs = vectorNet(data) # [batch size, len*2]
+        outputs, att = vectorNet(data) # [batch size, len*2]
         loss = lossfunc(outputs, torch.tanh(target))
         loss_meter.add(loss.item())
         
@@ -377,14 +391,15 @@ def test(batchSize):
         # data[:, :, -1] = pID
         outputs = torch.atanh(outputs.detach())
         if config.visual:
-            visualize(data.detach().cpu().numpy(), target.detach().cpu().numpy(), outputs.cpu().numpy(), pID)
+            visualize(data.detach().cpu().numpy(), target.detach().cpu().numpy(), 
+                        outputs.cpu().numpy(), att.detach().cpu().numpy(), pID)
         # if ii % 200 == 0 and ii > 0:
         #     print("iterate [%d], train loss: [%f]"%(ii, loss_meter.value()[0]))
         for i in range(0, outputs.shape[1], 2):
-            outputs[:, i] *= offset[:, 5] / 100
-            target[:, i] *= offset[:, 5] / 100
-            outputs[:, i + 1] *= offset[:, 6] / 100
-            target[:, i + 1] *= offset[:, 6] / 100
+            outputs[:, i] *= offset[:, 3] / 100
+            target[:, i] *= offset[:, 3] / 100
+            outputs[:, i + 1] *= offset[:, 4] / 100
+            target[:, i + 1] *= offset[:, 4] / 100
         maeloss = maelossfunc(outputs, target)
         mae_loss_meter.add(maeloss.item())
     print("test loss: ", loss_meter.value()[0])
@@ -450,8 +465,8 @@ if __name__ == '__main__':
     parser.add_argument("--epoch", dest="epoch", default=25, type=int)
     parser.add_argument("--learning_rate", dest="lr", default=0.001, type=float)
     args = parser.parse_args()
-    # train(epoch=config.epoch, learningRate=config.lr, batchSize=config.batch_size)
-    test(batchSize=args.batch_size)
+    train(epoch=config.epoch, learningRate=config.lr, batchSize=config.batch_size)
+    # test(batchSize=args.batch_size)
     # testCV(batchSize=args.batch_size)
 
     # random_train(epoch=args.epoch, learningRate=args.lr, batchSize=args.batch_size)

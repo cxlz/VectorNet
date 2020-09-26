@@ -63,6 +63,7 @@ class VectorNet(nn.Module):
         for i in range(1, data.shape[0]):
             if i + 1 == data.shape[0] or \
                     pID[i] != pID[i + 1]:
+                # print(pID[i])
                 tmp = torch.zeros(batchSize, 0, len).to(device)
                 while j <= i:
                     t = data[j]  # [batch size, len]
@@ -83,11 +84,11 @@ class VectorNet(nn.Module):
 
         # P's shape is [batch size, pNumber, pLen]
         # P = F.normalize(P, dim=2)
-        feature = self.globalGraph(P, id)  # [batch size, pLen]
+        feature, att = self.globalGraph(P, id)  # [batch size, pLen]
         # print(feature.device)
         # print(feature.shape)
         # raise NotImplementedError
-        return feature
+        return feature, att
 
 class VectorNetWithPredicting(nn.Module):
 
@@ -116,7 +117,7 @@ class VectorNetWithPredicting(nn.Module):
         :param x: the same as VectorNet.
         :return: Future trajectory vector with length timeStampNumber*2, the form is (x1,y1,x2,y2,...).
         """
-        x = self.vectorNet(x)
+        x, att = self.vectorNet(x)
         x = self.trajDecoder(x)
         x = torch.tanh(x)
-        return x
+        return x, att

@@ -84,8 +84,10 @@ def load_data(DATA_PATH, nameList):
                     ans[i, polyline_ID] != ans[i + 1, polyline_ID]:
                 if ans[i, type_ID] == 2 and cur_m_id == 0:
                     cur_m_id = int(ans[i, polyline_ID])
-                    max_m_id = max(max_m_id, cur_m_id)
+                    # print("cur_m_id: ", cur_m_id)
+                    max_m_id = max(max_m_id, id + 1)
                     m_id.append(cur_m_id)
+                # print(int(ans[i, polyline_ID]))
                 id = int(ans[i, polyline_ID]) - cur_m_id
                 # if ans[i, type_ID] == 2:
                 #     j = i + 1
@@ -189,12 +191,12 @@ def load_data(DATA_PATH, nameList):
                 break
             tmp = max_obj_size[i]
             lst = np.zeros(9)
-            lst[polyline_ID] = i
             while j < X[it].shape[0] and X[it][j, polyline_ID] == i:
                 x.append(X[it][j])
                 lst = X[it][j]
                 tmp -= 1
                 j += 1
+            lst[polyline_ID] = i
             while tmp > 0:
                 x.append(lst)
                 tmp -= 1
@@ -208,13 +210,14 @@ def load_data(DATA_PATH, nameList):
                 break
             tmp = max_map_size[i]
             lst = np.zeros(9)
-            lst[polyline_ID] = cur_m_id
+            # print("m_id: ", max_m_id + i)
             while j < MX[it].shape[0] and MX[it][j, polyline_ID] == cur_m_id:
                 MX[it][j, polyline_ID] = max_m_id + i
                 mx.append(MX[it][j])
                 lst = MX[it][j]
                 tmp -= 1
                 j += 1
+            lst[polyline_ID] = max_m_id + i
             while tmp > 0:
                 mx.append(lst)
                 tmp -= 1
@@ -222,11 +225,11 @@ def load_data(DATA_PATH, nameList):
         MXX.append(mx)
     # pf = pd.DataFrame(data=XX[0])
     # pf.to_csv('train_data_XX_' + name, header=False, index=False)
-    for i in range(len(offset)):
-        XX[i].append(offset[i])
     XX = np.array(XX).astype('float')
     MXX = np.array(MXX).astype('float')
     XX = np.concatenate((XX, MXX), axis=1)
+    # for i in range(len(offset)):
+    #     XX[i].append(offset[i])
     YY = np.array(YY).astype('float')
 
     # print(XX)
