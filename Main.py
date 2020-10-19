@@ -209,6 +209,10 @@ def visualize(data, labels, prediction, att, pID):
             cv2.imwrite(os.path.join(config.save_view_path, str(count) + ".jpg"), img)
             count += 1
 
+def my_print(log_text):
+    with open(config.log_file, "a") as f:
+        print(log_text)
+        f.write(log_text+"\n")
 
 def train(epoch, learningRate, batchSize):
     r"""
@@ -219,15 +223,15 @@ def train(epoch, learningRate, batchSize):
     :return: None
     """
 
-    print("train data path: [%s], train data size [%d]"%(TRAIN_DATA_PATH, len(TRAIN_FILE)))
+    my_print("train data path: [%s], train data size [%d]"%(TRAIN_DATA_PATH, len(TRAIN_FILE)))
     train = ArgoDataset(TRAIN_DATA_PATH, TRAIN_FILE)
-    print("test data path: [%s], test data size [%d]"%(TEST_DATA_PATH, len(TEST_FILE)))
+    my_print("test data path: [%s], test data size [%d]"%(TEST_DATA_PATH, len(TEST_FILE)))
     trainset = torch.utils.data.DataLoader(train, batch_size=batchSize, shuffle=True, drop_last=False, collate_fn=my_collate_fn)
     test = ArgoDataset(TEST_DATA_PATH, TEST_FILE)
     testset = torch.utils.data.DataLoader(test, batch_size=batchSize, collate_fn=my_collate_fn)
     if config.load_model:
         try:
-            print("loading model from [%s]"%config.load_model_path)
+            my_print("loading model from [%s]"%config.load_model_path)
             vectorNet = torch.load(config.load_model_path)
         except:
             print("model path error.")
@@ -249,8 +253,8 @@ def train(epoch, learningRate, batchSize):
     mae_loss_meter = meter.AverageValueMeter()
     pre_loss = float("inf")
     for iterator in range(epoch):
-        print("epoch [%d]: learning rate [%.10f]"%(iterator, lr))
         loss_meter.reset()
+        loss_meter.add(0)
         for ii, (data, target) in tqdm(enumerate(trainset)):
             data = data.to(device)
             target = target.to(device)
@@ -273,8 +277,9 @@ def train(epoch, learningRate, batchSize):
             if config.visual:
                 visualize(data.detach().cpu().numpy(), target.detach().cpu().numpy(), 
                             outputs.cpu().numpy(), att.detach().cpu().numpy(), pID)
-            if ii % 200 == 0 and ii > 0:
-                print("iterate [%d], train loss: [%f]"%(ii, loss_meter.value()[0]))
+            if ii % 200 == 0:
+                my_print("epoch [{:0>4d}]|iterate [{:0>4d}]|loss [{:>3.5f}]|learning rate [{}]".format(iterator, ii, loss_meter.value()[0], lr))
+                # my_print("iterate [%d], train loss: [%f]"%(ii, loss_meter.value()[0]))
             for i in range(0, outputs.shape[1], 2):
                 outputs[:, i] *= offset[:, 3] / 100
                 target[:, i] *= offset[:, 3] / 100
@@ -282,11 +287,12 @@ def train(epoch, learningRate, batchSize):
                 target[:, i + 1] *= offset[:, 4] / 100
             maeloss = maelossfunc(outputs, target)
             mae_loss_meter.add(maeloss.item())
-        print("train loss: ", loss_meter.value()[0])
-        print("train mae loss: ", mae_loss_meter.value()[0])
+        my_print("train loss: ", loss_meter.value()[0])
+        my_print("train mae loss: ", mae_loss_meter.value()[0])
         if loss_meter.value()[0] < pre_loss:
             pre_loss = loss_meter.value()[0]
             model_name = time.strftime(config.model_save_prefix + '%m%d_%H:%M:%S.model')
+            my_print("save model: %s"%os.path.join(config.model_save_path, model_name))
             torch.save(vectorNet, os.path.join(config.model_save_path, model_name))
         else:
             lr *= config.lr_decay
@@ -325,7 +331,8 @@ def train(epoch, learningRate, batchSize):
                     target[:, i + 1] *= offset[:, 4] / 100
                 maeloss = maelossfunc(outputs, target)
                 mae_loss_meter.add(maeloss.item())
-            print("test loss: ", loss_meter.value()[0])
+            my_print("test loss: ", loss_meter.value()[0])
+            my_print("test mae loss: ", mae_loss_meter.value()[0])
             
             #     t = askADE(outputs, target)
             #     print('minDis=', t[0].item(), 'ADE=', t[1].item())
@@ -353,7 +360,7 @@ def test(batchSize):
     config.save_view = True
     torch.nn.Module.dump_patches = True
     try:
-        print("loading model: [%s]"%config.load_model_path)
+        my_print("loading model: [%s]"%config.load_model_path)
         vectorNet = torch.load(config.load_model_path, map_location=config.map_location)
     except:
         print("model path error!")
@@ -402,7 +409,7 @@ def test(batchSize):
             target[:, i + 1] *= offset[:, 4] / 100
         maeloss = maelossfunc(outputs, target)
         mae_loss_meter.add(maeloss.item())
-    print("test loss: ", loss_meter.value()[0])
+    my_print("test loss: ", loss_meter.value()[0])
     print("test mae loss: ", mae_loss_meter.value()[0])
 
 

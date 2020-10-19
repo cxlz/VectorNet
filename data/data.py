@@ -131,7 +131,7 @@ def work(name, file):
             #             line_color = (0, 255, 0)
             #             img = cv2.circle(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale), 1, line_color, thickness= -1)
     # line_color = (0, 0, 0)
-    idList = avm.get_lane_ids_in_xy_bbox(AVX, AVY, city, 20)
+    idList = avm.get_lane_ids_in_xy_bbox(AVX, AVY, city, 200)
     for id in idList:
         lane = avm.city_lane_centerlines_dict[city][id]
         #        print(lane.id)

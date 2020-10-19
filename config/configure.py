@@ -10,8 +10,9 @@ time_resolution = 0.1
 feature_length = 9
 map_search_radius = 20
 
-TRAIN_DATA_PATH = 'data/argo/turn/train_data/'
-TEST_DATA_PATH = 'data/argo/turn/test_data/'
+DATA_ROOT = 'data/argo/turn'
+TRAIN_DATA_PATH = os.path.join(DATA_ROOT, 'train_data/')
+TEST_DATA_PATH =  os.path.join(DATA_ROOT, 'test_data/')
 model_save_path = "models/model"
 model_save_path = "/data/cxl/VectorNet/models"
 model_save_prefix = "VectorNet_19_tanh_subgraph_turn_"
@@ -19,6 +20,7 @@ load_model = False
 # load_model_path = "/datastore/data/cxl/VectorNet/models/VectorNet_19_tanh_subgraph_turn_0925_11:11:20.model"
 load_model_path = "/data/cxl/VectorNet/models/VectorNet_19_tanh_subgraph_turn_0925_11:11:20.model"
 # load_model_path = "models/model/VectorNet_no_slow_obj_19_0924_01:57:09.model"
+log_file = os.path.join(DATA_ROOT, "train_log.txt")
 
 
 lr = 0.001

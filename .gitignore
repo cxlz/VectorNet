@@ -1,5 +1,6 @@
 models/model/
 data/argo/
+data/grip/
 checkpoints/
 data/origin/
 data/view/
