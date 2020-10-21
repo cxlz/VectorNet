@@ -55,8 +55,9 @@ class Attention(nn.Module):
         K = self.linear[1](P)  # [batch size, n, C]
         V = self.linear[2](P)
 
-        att = torch.matmul(Q, K.permute(0, 2, 1))  # [batch size, 1, n]
-        att = F.softmax(att, dim=2)
+        ans = torch.matmul(Q, K.permute(0, 2, 1))  # [batch size, 1, n]
+        ans = F.softmax(ans, dim=2)
+        att = ans.detach()
         ans = torch.matmul(att, V)  # [batch size, 1, C]
 
         ans.squeeze_(1)

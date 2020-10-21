@@ -8,6 +8,7 @@ except:
 import os
 import cv2
 import time
+from datetime import datetime
 
 from tqdm import tqdm
 
@@ -18,7 +19,7 @@ from torchnet import meter
 from models.VectorNet import VectorNet
 from models.VectorNet import VectorNetWithPredicting
 # from config.configure import device
-from data.dataloader import load_train, load_test, ArgoDataset, my_collate_fn
+from data.dataloader_test import load_train, load_test, ArgoDataset, my_collate_fn
 import config.configure as config
 
 device = config.device
@@ -140,7 +141,11 @@ def visualize(data, labels, prediction, att, pID):
     img_resolution = 0.1
     img_half_scale = round(img_half_scale / img_resolution)
     global count
-    for traj, label, pred, a in zip(data, labels, prediction, att):
+    for idx in range(data.shape[0]):
+        traj = data[idx].copy()
+        label = labels[idx].copy()
+        pred = prediction[idx].copy()
+        a = att[idx].copy()
         head_line = traj[0]
         traj = traj[1:, :]
         idx = head_line[0]
@@ -167,11 +172,9 @@ def visualize(data, labels, prediction, att, pID):
             thickness = 1
             if a[-cur_id] > 0.5:
                 thickness = 2
-                print("point: ", traj[i, :])
+                # print("point: ", traj[i, :])
             if i > 0 and pID[i] != pID[i - 1]:
                 cur_id += 1
-            # if a[-cur_id] > 0.5:
-            #     print(traj[i, 0:4])
             if traj[i, 0] == 0 and traj[i, 2] == 0:
                 continue
             if traj[i, 4] == 2:
@@ -185,24 +188,25 @@ def visualize(data, labels, prediction, att, pID):
                 line_color = (255, 0, 0)
                 if traj[i, 0] != 0 or traj[i, 2] != 0:
                     img = cv2.line(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale),
-                                    (traj[i, 2] + img_half_scale, traj[i, 3] + img_half_scale), line_color, thickness=thickness)
+                                    (traj[i, 2] + img_half_scale, traj[i, 3] + img_half_scale), line_color, thickness=(1 + thickness))
                 # img = cv2.circle(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale), 1, line_color, lineType=8)
             else:
                 line_color = (0, 255, 0)
                 img = cv2.circle(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale), thickness, line_color, thickness= -1)
             
-        img1 = img.copy()
+        img = img.copy()
         line_color = (255, 0, 0)
         for j in range(label.shape[0] // 2 - 1):
-            img1 = cv2.circle(img1, (label[j * 2] + img_half_scale, label[j * 2 + 1] + img_half_scale), 3, line_color, thickness= 2)
+            img = cv2.circle(img, (label[j * 2] + img_half_scale, label[j * 2 + 1] + img_half_scale), 3, line_color, thickness= 2)
         
         line_color = (0, 0, 255)
         for j in range(pred.shape[0] // 2 - 1):
-            img1 = cv2.circle(img1, (pred[j * 2] + img_half_scale, pred[j * 2 + 1] + img_half_scale), 3, line_color, thickness= -1)
+            img = cv2.circle(img, (pred[j * 2] + img_half_scale, pred[j * 2 + 1] + img_half_scale), 3, line_color, thickness= -1)
 
             # img1 = cv2.line(img1, (label[j * 2] + img_half_scale, label[j * 2 + 1] + img_half_scale), 
-            #                 (label[j * 2 + 2] + img_half_scale, label[j * 2 + 3] + img_half_scale), line_color, thickness=2)
-        cv2.imshow("img1", img1)
+            #                 (label[j * 2 + 2]  + img_half_scale, label[j * 2 + 3] + img_half_scale), line_color, thickness=2)
+        # cv2.imshow("img1", img1)
+        # obs_info = "obs[{:0>5d}]_frame[{:0>5d}]_type[{:d}].jpg".format(0, 0, 0)
         cv2.imshow("img", img)
         cv2.waitKey(1)
         if config.save_view:
@@ -222,12 +226,13 @@ def train(epoch, learningRate, batchSize):
     :param batchSize:
     :return: None
     """
-
+    my_print('#######################################Train')
+    my_print("using device: %s"%config.device)
     my_print("train data path: [%s], train data size [%d]"%(TRAIN_DATA_PATH, len(TRAIN_FILE)))
     train = ArgoDataset(TRAIN_DATA_PATH, TRAIN_FILE)
     my_print("test data path: [%s], test data size [%d]"%(TEST_DATA_PATH, len(TEST_FILE)))
     trainset = torch.utils.data.DataLoader(train, batch_size=batchSize, shuffle=True, drop_last=False, collate_fn=my_collate_fn)
-    test = ArgoDataset(TEST_DATA_PATH, TEST_FILE)
+    test = ArgoDataset(TEST_DATA_PATH, TEST_FILE[:500])
     testset = torch.utils.data.DataLoader(test, batch_size=batchSize, collate_fn=my_collate_fn)
     if config.load_model:
         try:
@@ -238,7 +243,7 @@ def train(epoch, learningRate, batchSize):
             return
     else:
         vectorNet = VectorNetWithPredicting(len=9, timeStampNumber=30)
-
+    print("model save path: [%s]"%config.model_save_path)
     # for para in vectorNet.named_parameters():
     #     print(para)
     # exit(0)
@@ -252,6 +257,7 @@ def train(epoch, learningRate, batchSize):
     loss_meter = meter.AverageValueMeter()
     mae_loss_meter = meter.AverageValueMeter()
     pre_loss = float("inf")
+    min_loss_model = ""
     for iterator in range(epoch):
         loss_meter.reset()
         loss_meter.add(0)
@@ -263,7 +269,10 @@ def train(epoch, learningRate, batchSize):
             # data = data[:, 0:data.shape[1] - 1, :]
             pID = data[0, 1:, -1].detach().cpu().numpy().copy()
             
+            # t1 = time.time()
             outputs, att = vectorNet(data) # [batch size, len*2]
+            # t2 = time.time()
+            # print("inference time: ", t2 -t1)
             loss = lossfunc(outputs, torch.tanh(target))
             loss_meter.add(loss.item())
             loss.backward()
@@ -273,12 +282,11 @@ def train(epoch, learningRate, batchSize):
             # print('minDis=', t[0].item(), 'ADE=', t[1].item())
             optimizer.step()
             # data[:, :, -1] = pID
-            outputs = torch.atanh(outputs.detach())
-            if config.visual:
-                visualize(data.detach().cpu().numpy(), target.detach().cpu().numpy(), 
-                            outputs.cpu().numpy(), att.detach().cpu().numpy(), pID)
-            if ii % 200 == 0:
-                my_print("epoch [{:0>4d}]|iterate [{:0>4d}]|loss [{:>3.5f}]|learning rate [{}]".format(iterator, ii, loss_meter.value()[0], lr))
+
+            outputs = torch.tensor(np.arctanh(outputs.detach().cpu().numpy())).to(device)
+            # if config.visual:
+            #     visualize(data.detach().cpu().numpy(), target.detach().cpu().numpy(), 
+            #                 outputs.detach().cpu().numpy(), att.detach().cpu().numpy(), pID)
                 # my_print("iterate [%d], train loss: [%f]"%(ii, loss_meter.value()[0]))
             for i in range(0, outputs.shape[1], 2):
                 outputs[:, i] *= offset[:, 3] / 100
@@ -287,22 +295,27 @@ def train(epoch, learningRate, batchSize):
                 target[:, i + 1] *= offset[:, 4] / 100
             maeloss = maelossfunc(outputs, target)
             mae_loss_meter.add(maeloss.item())
-        my_print("train loss: ", loss_meter.value()[0])
-        my_print("train mae loss: ", mae_loss_meter.value()[0])
+            if ii % 20 == 0:
+                my_print("{}|epoch [{:0>4d}]|iterate [{:0>4d}]|loss [{:>3.5f}]|learning rate [{}]".format(datetime.now(), iterator, ii, loss_meter.value()[0], lr))
+        my_print("train loss [{:>3.5f}]".format(loss_meter.value()[0]))
+        my_print("train mae loss [{:>3.5f}]".format(mae_loss_meter.value()[0]))
         if loss_meter.value()[0] < pre_loss:
-            pre_loss = loss_meter.value()[0]
             model_name = time.strftime(config.model_save_prefix + '%m%d_%H:%M:%S.model')
             my_print("save model: %s"%os.path.join(config.model_save_path, model_name))
             torch.save(vectorNet, os.path.join(config.model_save_path, model_name))
         else:
             lr *= config.lr_decay
-            if lr < 1e-8:
+            if lr < 1e-10:
+                print(pre_loss, min_loss_model)
                 break
             for param_group in optimizer.param_groups:
                 param_group['lr'] = lr
-        if (iterator + 1) % 5 == 0:
+        
+        my_print('#######################################Test')
+        if (iterator + 1) % 1 == 0:
             # lr *= 0.3
             loss_meter.reset()
+            mae_loss_meter.reset()
             optimizer = torch.optim.Adam(vectorNet.parameters(), lr=lr)
 
             minADE = torch.zeros(1).to(device)
@@ -314,16 +327,22 @@ def train(epoch, learningRate, batchSize):
 
                 offset = data[:, 0, :]  # [0, 0, 0, 0, 0, maxX, maxY, ..., 0]
                 # data = data[:, 0:data.shape[1] - 1, :]
+                pID = data[0, 1:, -1].detach().cpu().numpy().copy()
 
                 outputs, att = vectorNet(data)
 
-
                 # print(outputs)
                 # print(target)
-                loss = lossfunc(outputs, target)
+                loss = lossfunc(outputs, torch.tanh(target))
                 # print('loss=', loss.item())
                 loss_meter.add(loss.item())
-                outputs = torch.atanh(outputs.detach())
+
+                # outputs = torch.atanh(outputs.detach())
+                outputs = torch.tensor(np.arctanh(outputs.detach().cpu().numpy())).to(device)
+
+                if config.visual:
+                    visualize(data.detach().cpu().numpy(), target.detach().cpu().numpy(), 
+                                outputs.detach().cpu().numpy(), att.detach().cpu().numpy(), pID)
                 for i in range(0, outputs.shape[1], 2):
                     outputs[:, i] *= offset[:, 3] / 100
                     target[:, i] *= offset[:, 3] / 100
@@ -331,8 +350,8 @@ def train(epoch, learningRate, batchSize):
                     target[:, i + 1] *= offset[:, 4] / 100
                 maeloss = maelossfunc(outputs, target)
                 mae_loss_meter.add(maeloss.item())
-            my_print("test loss: ", loss_meter.value()[0])
-            my_print("test mae loss: ", mae_loss_meter.value()[0])
+            my_print("test loss [{:>3.5f}]".format(loss_meter.value()[0]))
+            my_print("test mae loss [{:>3.5f}]".format(mae_loss_meter.value()[0]))
             
             #     t = askADE(outputs, target)
             #     print('minDis=', t[0].item(), 'ADE=', t[1].item())
@@ -353,6 +372,7 @@ def test(batchSize):
     Test my model from file.
     :return: None
     """
+    my_print('#######################################Test')
     train = ArgoDataset(TRAIN_DATA_PATH, TRAIN_FILE[:500])
     trainset = torch.utils.data.DataLoader(train, batch_size=batchSize, shuffle=True, drop_last=False, collate_fn=my_collate_fn)
     test = ArgoDataset(TEST_DATA_PATH, TEST_FILE)
@@ -371,14 +391,14 @@ def test(batchSize):
     print("save view path: [%s]"%config.save_view_path)
     lossfunc = torch.nn.MSELoss()
     minADE = torch.zeros(1).to(device)
-    minDis = torch.zeros(1).to(device)
+    minDis = torch.zeros(1).to(device)  
     minDis[0] = -1
     lossfunc = torch.nn.MSELoss()
     maelossfunc = torch.nn.L1Loss()
     loss_meter = meter.AverageValueMeter()
     mae_loss_meter = meter.AverageValueMeter()
     loss_meter.reset()
-    for ii, (data, target) in tqdm(enumerate(trainset)):
+    for ii, (data, target) in tqdm(enumerate(testset)): 
         data = data.to(device)
         target = target.to(device)
         offset = data[:, 0, :]  # [0, 0, 0, 0, 0, maxX, maxY, ..., 0]
@@ -396,10 +416,10 @@ def test(batchSize):
         # print('minDis=', t[0].item(), 'ADE=', t[1].item())
         # optimizer.step()
         # data[:, :, -1] = pID
-        outputs = torch.atanh(outputs.detach())
-        if config.visual:
-            visualize(data.detach().cpu().numpy(), target.detach().cpu().numpy(), 
-                        outputs.cpu().numpy(), att.detach().cpu().numpy(), pID)
+        outputs = torch.tensor(np.arctanh(outputs.detach().cpu().numpy())).to(device)
+        # if config.visual:
+        #     visualize(data.detach().cpu().numpy(), target.detach().cpu().numpy(), 
+        #                 outputs.cpu().numpy(), att.detach().cpu().numpy(), pID)
         # if ii % 200 == 0 and ii > 0:
         #     print("iterate [%d], train loss: [%f]"%(ii, loss_meter.value()[0]))
         for i in range(0, outputs.shape[1], 2):
@@ -409,8 +429,8 @@ def test(batchSize):
             target[:, i + 1] *= offset[:, 4] / 100
         maeloss = maelossfunc(outputs, target)
         mae_loss_meter.add(maeloss.item())
-    my_print("test loss: ", loss_meter.value()[0])
-    print("test mae loss: ", mae_loss_meter.value()[0])
+    my_print("test loss [{:>3.5f}]".format(loss_meter.value()[0]))
+    my_print("test mae loss [{:>3.5f}]".format(mae_loss_meter.value()[0]))
 
 
 def testCV(batchSize):
@@ -472,8 +492,10 @@ if __name__ == '__main__':
     parser.add_argument("--epoch", dest="epoch", default=25, type=int)
     parser.add_argument("--learning_rate", dest="lr", default=0.001, type=float)
     args = parser.parse_args()
-    train(epoch=config.epoch, learningRate=config.lr, batchSize=config.batch_size)
-    # test(batchSize=args.batch_size)
+    if config.train:
+        train(epoch=config.epoch, learningRate=config.lr, batchSize=config.batch_size)
+    else:
+        test(batchSize=args.batch_size)
     # testCV(batchSize=args.batch_size)
 
     # random_train(epoch=args.epoch, learningRate=args.lr, batchSize=args.batch_size)

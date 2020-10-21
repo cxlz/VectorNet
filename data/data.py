@@ -112,9 +112,9 @@ def work(name, file):
                 distance = np.sqrt(np.square(now[0][3] - now[19][3]) + np.square(now[0][4] - now[19][4]))
                 angle = np.arctan2(now[0][4] - now[49][4], now[0][3] - now[49][3]) - np.arctan2(now[0][4] - now[24][4], now[0][3] - now[24][3])
                 angle = int(angle / np.pi * 180) % 360
-                # if distance < 1 or angle > 350 or angle < 10:
-                #     # print(name, distance, angle)
-                #     return -1
+                if distance < 1: # or angle > 350 or angle < 10:
+                    # print(name, distance, angle)
+                    return -1
                 AVTIME = ans[i-30, 0]
             # if len(vecList) > 2:
             #     traj = np.array(vecList, dtype="float")
@@ -131,7 +131,7 @@ def work(name, file):
             #             line_color = (0, 255, 0)
             #             img = cv2.circle(img, (traj[i, 0] + img_half_scale, traj[i, 1] + img_half_scale), 1, line_color, thickness= -1)
     # line_color = (0, 0, 0)
-    idList = avm.get_lane_ids_in_xy_bbox(AVX, AVY, city, 200)
+    idList = avm.get_lane_ids_in_xy_bbox(AVX, AVY, city, 20)
     for id in idList:
         lane = avm.city_lane_centerlines_dict[city][id]
         #        print(lane.id)
@@ -175,6 +175,7 @@ def work(name, file):
             tmp[i , j] *= 100
         if tmp[i, 4] != 2:
             tmp[i, 5] -= AVTIME
+            tmp[i, 6] -= AVTIME
 
     # print(tmp)
     # print(tmp.shape)
@@ -190,7 +191,7 @@ def work(name, file):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--data_dir", type=str, default="/data/cxl/argoverse/train/data/", required=False, help="data load dir")
-    parser.add_argument("-s", "--save_dir", type=str, default="data/argo/turn/train_data", required=False, help="data save dir")
+    parser.add_argument("-s", "--save_dir", type=str, default="data/argo/train_data", required=False, help="data save dir")
     parser.add_argument("-n", "--num", type=int, default=500, required=False, help="num of files to load")
     args = parser.parse_args()
     # DATA_DIR = 'data/argo/forecasting_sample/data/'

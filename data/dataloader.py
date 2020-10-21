@@ -117,13 +117,13 @@ def load_data(DATA_PATH, nameList):
                         y.append(ans[j, 3])
                         j += 1
                 else:
+                    count = 0
                     if ans[i, type_ID] == 2:
                         max_map_size[id] = np.max([max_map_size[id], i - j + 1])
                         while j <= i:
                             mtx.append(ans[j])  
                             j += 1
                     else:
-                        count = 0
                         max_obj_size[id] = np.max([max_obj_size[id], min(19, i - j + 1)])
                         while j <= i:
                             if count < 19:
@@ -173,9 +173,9 @@ def load_data(DATA_PATH, nameList):
     # pf = pd.DataFrame(data=x)
     # pf.to_csv('train_data_' + name, header=False, index=False)
 
-    ans = 0
-    for i in range(0, max_obj_size.shape[0]):
-        ans += max_obj_size[i]
+    # ans = 0
+    # for i in range(0, max_obj_size.shape[0]):
+    #     ans += max_obj_size[i]
 
     # print(ans)
     XX = []
